@@ -22,7 +22,7 @@
 
 <header id="topbar">
   <div class="logo">☕ <b>Café Kết Bạn</b> <span class="tag3d">3D</span></div>
-  <div class="top-info"><span id="online-count">0/100 đang trong quán</span></div>
+  <div class="top-info"><span id="net-dot" title="Trạng thái kết nối">●</span> <span id="online-count">0/100 đang trong quán</span></div>
   <div class="top-actions">
     <button id="btn-tv" title="Mở tivi YouTube">📺 Tivi</button>
     <button id="btn-sound" title="Âm thanh của riêng bạn">🔊</button>
@@ -92,6 +92,8 @@
 
 <div id="toast" class="hidden"></div>
 
+<script src="./vendor/firebase-app-compat.js"></script>
+<script src="./vendor/firebase-database-compat.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

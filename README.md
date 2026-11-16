@@ -12,10 +12,36 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   có khớp tay chân — đi bộ, ngồi xuống ghế, nâng ly uống cà phê, thở và quay đầu.
   Màn chọn nhân vật có xem trước 3D xoay vòng.
 - **Chat bong bóng 3D**: bong bóng bám theo đầu nhân vật, kèm log chat.
-- **Tivi YouTube**: màn hình lớn trên tường, bấm vào để mở trình phát, dán link đổi video. Từ 2026-11-17 video chiếu thật lên màn hình tivi 3D trong game (CSS3DRenderer): bấm vào tivi hoặc nút "Chiếu lên màn hình 3D" để bật, bấm "✕ Tắt màn hình 3D" để tắt, lúc tắt màn hình hiện sóng nhạc.
+- **Tivi YouTube**: màn hình lớn trên tường (luôn bật, không bấm tương tác được). Video chiếu thật lên màn hình tivi 3D trong game (CSS3DRenderer), tự tắt phụ đề và thanh điều khiển. Dán link YouTube để thêm vào hàng chờ chung cả quán — hết video này tự phát video người sau. Âm thanh chỉnh riêng từng người (nút loa trên thanh trên cùng + thanh trượt trong bảng tivi).
 - **Kết bạn**: bấm vào người khác để xem hồ sơ, chào và kết bạn (lưu localStorage).
 - **Camera**: kéo xoay, lăn chuột zoom, nút đổi góc nhìn (toàn cảnh / theo bạn / tivi).
-- **Bot khách quen**: ~50 bot tự đi lại, đổi bàn, trò chuyện và trả lời bạn.
+
+## Chơi chung thật (người thật, không bot)
+
+Quán đã nối **Firebase Realtime Database** (project `cafe-ket-ban`, Singapore) —
+không còn bot, mọi người trong quán đều là người thật:
+
+- Vào quán sẽ thấy nhau đi lại, ngồi ghế (ghế có người thì không ngồi được nữa),
+  uống cà phê, chat bong bóng + log chat chung.
+- Tivi và hàng chờ video là chung cả quán: ai thêm video thì mọi người cùng xem.
+- Chấm xanh ở góc trên là trạng thái kết nối (xanh = đang chơi chung, xám = mất mạng, chơi một mình).
+
+Thử nhanh: mở quán bằng 2 trình duyệt (hoặc 1 thường + 1 ẩn danh) với 2 tên khác nhau,
+người này đi lại/chat thì người kia thấy ngay.
+
+Lưu ý: database đang ở **test mode** (mở toàn quyền đọc/ghi, hết hạn sau 30 ngày kể
+từ lúc tạo). Trước khi hết hạn, vào Firebase Console → Realtime Database → Rules
+và đặt rule chỉ cho phép đọc/ghi trong `rooms/cafe1`, ví dụ:
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "cafe1": { ".read": true, ".write": true }
+    }
+  }
+}
+```
 
 ## Chạy thử
 
@@ -35,9 +61,3 @@ Kéo thả thư mục này vào https://vercel.com/new, hoặc:
 ```bash
 npx vercel
 ```
-
-## Chơi chung thật (100 người)
-
-Bản này chạy demo với bot. Để người thật vào chung một phòng, cần backend
-đồng bộ vị trí/chat (ví dụ Firebase Realtime Database) — cắm vào danh sách
-`state.players` và `state.seats` trong `app.js`.

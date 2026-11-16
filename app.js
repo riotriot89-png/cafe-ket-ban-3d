@@ -13,34 +13,7 @@ const CHARACTERS = [
   { name: 'Leo',   gender: 'Nam', desc: 'Hay kể chuyện, ngồi đâu cũng thành tâm điểm.', skin: 0xd99a5b, hair: 0x292524, hairStyle: 'curly', shirt: 0x4f46e5, pants: 0x1e293b },
   { name: 'Mia',   gender: 'Nữ', desc: 'Nhẹ nhàng, thích nghe nhạc và ngắm hoàng hôn.', skin: 0xf2c89b, hair: 0x451a03, hairStyle: 'ponytail', shirt: 0xec4899, pants: 0x334155 },
 ];
-const BOT_NAMES = ['An Nhiên','Bình Minh','Chi Mai','Dũng','Hà My','Khánh Duy','Thu Thảo','Minh Quân','Phương Anh','Tuấn Anh','Ngọc Trâm','Hoàng Nam','Thanh Hằng','Đức Anh','Lan Phương','Quốc Bảo','Diệu Linh','Hữu Phúc','Mai Chi','Việt Hoàng','Kim Ngân','Gia Huy','Thùy Dương','Nhật Minh','Ánh Tuyết','Tiến Đạt','Hồng Nhung','Phúc Lâm','Cẩm Tú','Mạnh Hùng','Yến Nhi','Bảo Trân','Hải Đăng','Quỳnh Anh','Sơn Tùng','Linh Đan','Thanh Sơn','Mỹ Linh','Anh Khoa','Trà My'];
 const RANDOM_NAMES = ['Minh Anh','Thu Hằng','Quốc Anh','Lan Chi','Hoàng Phúc','Thảo Nguyên','Đức Huy','Phương Thảo'];
-const BOT_LINES = [
-  'Cà phê ở đây ngon thật, mọi người thử chưa?',
-  'Ai nghe nhạc lofi với mình không?',
-  'Hôm nay quán đông vui quá!',
-  'Mình mới vào quán, có ai làm quen không?',
-  'Ngồi sân vườn chill ghê, gió mát lắm.',
-  'Tivi đang chiếu nhạc hay quá!',
-  'Ai rủ mình chơi game không?',
-  'Ly cà phê này là ly thứ 3 của mình rồi đó.',
-  'Quán này view đẹp, ngồi cả buổi không chán.',
-  'Mình thích góc lounge, yên tĩnh mà ấm.',
-  'Có ai biết bài này tên gì không?',
-  'Chào mọi người, mình là khách mới!',
-  'Trời đẹp thế này mà không ra sân vườn thì phí.',
-  'Ai muốn đổi bàn ngồi chung cho vui không?',
-  'Cô Lan pha cà phê ngon nhất khu này luôn.',
-];
-const REPLIES = [
-  { keys: ['chào', 'hello', 'hi ', 'xin chào'], text: ['Chào bạn! Ngồi xuống đây chơi với tụi mình nè.', 'Chào chào! Bạn uống gì chưa?'] },
-  { keys: ['cà phê', 'cafe', 'coffee'], text: ['Cà phê ở đây ngon lắm, mình gọi thêm ly nữa đây.', 'Mình cũng đang uống cà phê nè, thơm ghê!'] },
-  { keys: ['tên'], text: ['Mình tên là {name}, rất vui được gặp bạn!', 'Tên mình là {name}, bạn tên gì?'] },
-  { keys: ['nhạc', 'music', 'bài'], text: ['Tivi đang mở nhạc lofi đó, nghe chill lắm.', 'Mình thích nghe nhạc ở quán này, loa hay ghê.'] },
-  { keys: ['buồn', 'chán'], text: ['Đừng buồn, ngồi đây tán gẫu với mọi người cho vui nè.', 'Ra sân vườn ngồi hít gió cho đỡ buồn đi bạn.'] },
-  { keys: ['đẹp', 'xinh'], text: ['Cảm ơn bạn nha! Quán này lên hình cũng đẹp lắm.'] },
-  { keys: ['game', 'chơi'], text: ['Chơi game gì? Mình tham gia với!', 'Mình rảnh nè, chơi gì cũng được.'] },
-];
 const ZONE_NAMES = { hall: 'Sảnh chính', terrace: 'Sân vườn', lounge: 'Lounge' };
 
 /* ============ TRẠNG THÁI ============ */
@@ -56,6 +29,194 @@ const $ = (id) => document.getElementById(id);
 
 /* Chế độ nhẹ cho máy yếu: ?lowfx=1 (tắt bóng đổ, pixel ratio 1) */
 const LOWFX = new URLSearchParams(location.search).has('lowfx');
+
+/* ============ FIREBASE — NGƯỜI THẬT CHƠI CHUNG ============
+   Quán không còn bot: mọi người trong quán đều là người thật, đồng bộ qua
+   Firebase Realtime Database (project cafe-ket-ban, Singapore).
+   - rooms/cafe1/players/{id}: vị trí, ghế, trạng thái, tin nhắn của từng người
+   - rooms/cafe1/chat: lịch sử chat chung
+   - rooms/cafe1/tv/current + tv/queue: video và hàng chờ chung cả quán
+   Nếu không kết nối được Firebase thì quán vẫn chơi được một mình. */
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyBnbpbq_jQy18y_-F3mrX3CgdFcKj9NxhI',
+  authDomain: 'cafe-ket-ban.firebaseapp.com',
+  databaseURL: 'https://cafe-ket-ban-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'cafe-ket-ban',
+  storageBucket: 'cafe-ket-ban.firebasestorage.app',
+  messagingSenderId: '352844936742',
+  appId: '1:352844936742:web:8df307ed62b5a538b098e7',
+  measurementId: 'G-H59KB7SM5S',
+};
+const ROOM = 'cafe1';
+let fbDb = null, fbReady = false;
+const myFbId = 'u_' + Math.random().toString(36).slice(2, 10);
+let myPlayerRef = null, mySeatAt = 0, myChatKeys = new Set();
+let sharedCurrentId = null, sharedQueue = []; // [{key, id, by, at}]
+let fbPlayersReady = false;
+function fbInit() {
+  try {
+    if (!window.firebase || !firebase.initializeApp) { console.warn('Firebase SDK chưa tải được, chơi một mình'); return; }
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb = firebase.database();
+    fbReady = true;
+    fbDb.ref('.info/connected').on('value', (snap) => {
+      const on = snap.val() === true;
+      $('net-dot').classList.toggle('on', on);
+      $('net-dot').title = on ? 'Đã kết nối — đang chơi chung với mọi người' : 'Mất kết nối — bạn đang chơi một mình';
+      // Chỉ báo "đã kết nối" khi mạng thật sự thông (SDK tải xong chưa có nghĩa là nối được)
+      if (on && state.entered && !window._fbHelloLogged) {
+        window._fbHelloLogged = true;
+        log('<span class="sys">🌐 Đã kết nối — người thật vào quán sẽ thấy bạn!</span>');
+      }
+    });
+    listenPlayers();
+    listenChat();
+    listenTv();
+    // Nhịp tim: cập nhật lastSeen để người khác không tưởng mình đã thoát
+    setInterval(() => { if (state.entered) publishMe(true); }, 15000);
+    // Dọn người đã thoát mà onDisconnect chưa kịp chạy
+    setInterval(() => {
+      if (!fbReady) return;
+      fbDb.ref(`rooms/${ROOM}/players`).once('value', (snap) => {
+        const v = snap.val() || {};
+        const now = Date.now();
+        Object.entries(v).forEach(([id, d]) => {
+          if (id !== myFbId && now - (d.at || 0) > 90000) fbDb.ref(`rooms/${ROOM}/players/${id}`).remove();
+        });
+      });
+    }, 30000);
+  } catch (e) { console.warn('Không kết nối được Firebase', e); }
+}
+function joinFirebase() {
+  if (!fbReady) { toast('Không kết nối được máy chủ, bạn đang chơi một mình'); return; }
+  myPlayerRef = fbDb.ref(`rooms/${ROOM}/players/${myFbId}`);
+  myPlayerRef.onDisconnect().remove();
+  publishMe(true);
+}
+let lastPublish = 0;
+function myStateData() {
+  const me = state.players.get('me');
+  return {
+    name: state.myName || 'Khách',
+    char: state.myChar,
+    x: me ? +me.group.position.x.toFixed(2) : 0,
+    z: me ? +me.group.position.z.toFixed(2) : 15.5,
+    rotY: me ? +me.group.rotation.y.toFixed(2) : Math.PI,
+    mode: me ? me.mode : 'idle',
+    seat: me && me.seat ? me.seat.id : null,
+    seatAt: mySeatAt,
+    drink: me ? me.drink : 0,
+    msg: me && me._lastMsg ? me._lastMsg.text : '',
+    msgAt: me && me._lastMsg ? me._lastMsg.at : 0,
+    at: Date.now(),
+  };
+}
+function publishMe(now = false) {
+  if (!fbReady || !state.entered || !myPlayerRef) return;
+  const t = Date.now();
+  if (now || t - lastPublish >= 250) { lastPublish = t; myPlayerRef.set(myStateData()); }
+}
+function listenPlayers() {
+  const ref = fbDb.ref(`rooms/${ROOM}/players`);
+  ref.once('value', () => { fbPlayersReady = true; });
+  ref.on('child_added', (snap) => {
+    const id = snap.key, d = snap.val();
+    if (!d || id === myFbId) return;
+    if (Date.now() - (d.at || 0) > 90000) { snap.ref.remove(); return; }
+    if (state.players.has(id)) return;
+    const spec = CHARACTERS[d.char] || CHARACTERS[0];
+    const c = spawnCharacter(id, d.name || 'Khách', spec, { x: d.x ?? 0, z: d.z ?? 15.5, rotY: d.rotY ?? 0 });
+    c.isRemote = true;
+    c.tx = d.x ?? 0; c.tz = d.z ?? 15.5; c.trotY = d.rotY ?? 0;
+    applyRemoteState(c, d);
+    if (fbPlayersReady) log(`<span class="sys">👋 ${escapeHtml(d.name || 'Khách')} vừa vào quán!</span>`);
+  });
+  ref.on('child_changed', (snap) => {
+    const id = snap.key, d = snap.val();
+    if (!d || id === myFbId) return;
+    if (Date.now() - (d.at || 0) > 90000) { snap.ref.remove(); return; }
+    const c = state.players.get(id);
+    if (!c) return;
+    c.tx = d.x ?? c.tx; c.tz = d.z ?? c.tz; c.trotY = d.rotY ?? c.trotY;
+    applyRemoteState(c, d);
+    // Ghế mình đang giữ bị người khác ngồi mà họ giữ trước -> nhường ghế
+    const me = state.players.get('me');
+    if (me && me.seat && d.seat === me.seat.id && (d.seatAt || 0) < mySeatAt) {
+      freeSeat(me.seat); me.seat = null; me.mode = 'idle'; me.pendingSeat = null; me.path = [];
+      publishMe(true);
+      toast('Ghế này có người ngồi trước rồi, chọn ghế khác nhé');
+    }
+  });
+  ref.on('child_removed', (snap) => {
+    const id = snap.key;
+    const c = state.players.get(id);
+    if (!c || id === myFbId) return;
+    log(`<span class="sys">👋 ${escapeHtml(c.name)} đã rời quán.</span>`);
+    removeCharacter(id);
+  });
+}
+function applyRemoteState(c, d) {
+  const seatId = d.seat;
+  if (seatId !== null && seatId !== undefined) {
+    const seat = state.seats[seatId];
+    if (seat && c.seat !== seat) {
+      if (c.seat) freeSeat(c.seat);
+      c.seat = seat; seat.occupiedBy = c.id; seat.cup.visible = true;
+    }
+  } else if (c.seat) {
+    freeSeat(c.seat); c.seat = null;
+  }
+  if (d.drink && !c._lastDrink) startDrink(c);
+  c._lastDrink = d.drink ? 1 : 0;
+  if (d.msg && d.msgAt && d.msgAt !== c._shownMsgAt) {
+    c._shownMsgAt = d.msgAt;
+    showBubble(c.id, d.msg);
+  }
+}
+function listenChat() {
+  const ref = fbDb.ref(`rooms/${ROOM}/chat`).limitToLast(60);
+  ref.on('child_added', (snap) => {
+    const d = snap.val();
+    if (!d || myChatKeys.has(snap.key)) return;
+    log(`<b>${escapeHtml(d.name || 'Khách')}:</b> ${escapeHtml(d.text || '')}`);
+  });
+}
+function listenTv() {
+  fbDb.ref(`rooms/${ROOM}/tv/current`).on('value', (snap) => {
+    const d = snap.val();
+    if (d && d.id) {
+      sharedCurrentId = d.id;
+      if (d.id !== state.videoId) setVideo(d.id);
+    } else if (!d) {
+      fbDb.ref(`rooms/${ROOM}/tv/current`).set({ id: DEFAULT_VIDEO, by: 'Quán', at: Date.now() });
+    }
+    renderQueue();
+  });
+  fbDb.ref(`rooms/${ROOM}/tv/queue`).on('value', (snap) => {
+    const v = snap.val() || {};
+    sharedQueue = Object.entries(v).map(([key, it]) => ({ key, ...it })).sort((a, b) => (a.at || 0) - (b.at || 0));
+    renderQueue();
+  });
+}
+function setSharedCurrent(id, by) {
+  if (!fbReady) return;
+  sharedCurrentId = id;
+  fbDb.ref(`rooms/${ROOM}/tv/current`).set({ id, by: by || 'Khách', at: Date.now() });
+}
+function advanceSharedTv() {
+  if (!fbReady) return;
+  fbDb.ref(`rooms/${ROOM}/tv/queue`).once('value', (snap) => {
+    const v = snap.val() || {};
+    const items = Object.entries(v).map(([key, it]) => ({ key, ...it })).sort((a, b) => (a.at || 0) - (b.at || 0));
+    if (items.length) {
+      const first = items[0];
+      fbDb.ref(`rooms/${ROOM}/tv/queue/${first.key}`).remove();
+      setSharedCurrent(first.id, first.by);
+    } else {
+      setSharedCurrent(DEFAULT_VIDEO, 'Quán');
+    }
+  });
+}
 
 /* ============ SCENE ============ */
 const container = $('scene-container');
@@ -381,6 +542,20 @@ async function fetchTitle(id) {
 }
 function renderQueue() {
   const box = $('tv-queue');
+  if (fbReady) {
+    if (sharedCurrentId) fetchTitle(sharedCurrentId);
+    let html = '<div class="q-title">🎵 Đang chiếu: ' + escapeHtml(titleCache.get(sharedCurrentId) || sharedCurrentId || 'Lofi của quán') + '</div>';
+    if (!sharedQueue.length) {
+      html += '<div style="color:rgba(255,255,255,.6)">Hàng chờ trống — dán link YouTube để thêm video, hết video này sẽ tới video sau.</div>';
+    } else {
+      sharedQueue.forEach((item, i) => {
+        html += `<div class="queue-item" data-i="${i}">${i + 1}. ${escapeHtml(titleCache.get(item.id) || item.id)} <span class="q-by">• ${escapeHtml(item.by)}</span></div>`;
+      });
+    }
+    box.innerHTML = html;
+    box.querySelectorAll('.queue-item').forEach((el) => el.addEventListener('click', () => skipToQueue(parseInt(el.dataset.i, 10))));
+    return;
+  }
   const current = tvQueueIndex >= 0 ? tvQueue[tvQueueIndex] : null;
   let html = '<div class="q-title">🎵 Đang chiếu: ' + escapeHtml(current ? (titleCache.get(current.id) || current.id) : 'Lofi của quán') + '</div>';
   if (!tvQueue.length) {
@@ -394,7 +569,19 @@ function renderQueue() {
   box.querySelectorAll('.queue-item').forEach((el) => el.addEventListener('click', () => skipToQueue(parseInt(el.dataset.i, 10))));
 }
 function addToQueue(id, by) {
-  tvQueue.push({ id, by: by || 'Khách' });
+  by = by || 'Khách';
+  if (fbReady) {
+    fetchTitle(id);
+    if (!sharedCurrentId || sharedCurrentId === DEFAULT_VIDEO) {
+      setSharedCurrent(id, by);
+      toast('Đang phát video của bạn 📺');
+    } else {
+      fbDb.ref(`rooms/${ROOM}/tv/queue`).push({ id, by, at: Date.now() });
+      toast('Đã thêm vào hàng chờ, hết video này sẽ tới lượt bạn 📺');
+    }
+    return;
+  }
+  tvQueue.push({ id, by });
   fetchTitle(id);
   if (tvQueueIndex === -1) {
     tvQueueIndex = 0;
@@ -406,6 +593,11 @@ function addToQueue(id, by) {
   renderQueue();
 }
 function playNextInQueue() {
+  if (fbReady) {
+    // Chỉ người đang chiếu đúng video vừa hết mới được chuyển bài (tránh chuyển 2 lần)
+    if (sharedCurrentId && state.videoId === sharedCurrentId) advanceSharedTv();
+    return;
+  }
   if (tvQueueIndex >= 0 && tvQueueIndex < tvQueue.length - 1) {
     tvQueueIndex++;
     setVideo(tvQueue[tvQueueIndex].id);
@@ -417,6 +609,15 @@ function playNextInQueue() {
   renderQueue();
 }
 function skipToQueue(i) {
+  if (fbReady) {
+    const item = sharedQueue[i];
+    if (!item) return;
+    const updates = {};
+    for (let j = 0; j <= i; j++) updates[`rooms/${ROOM}/tv/queue/${sharedQueue[j].key}`] = null;
+    fbDb.ref().update(updates);
+    setSharedCurrent(item.id, item.by);
+    return;
+  }
   if (!tvQueue[i]) return;
   tvQueueIndex = i;
   setVideo(tvQueue[i].id);
@@ -645,10 +846,11 @@ function buildCharacter(spec) {
 function spawnCharacter(id, name, spec, opts = {}) {
   const built = buildCharacter(spec);
   const c = {
-    id, name, spec, ...built, isBot: !!opts.bot,
+    id, name, spec, ...built,
     mode: 'idle', path: [], pendingSeat: null, seat: null,
     speed: 2.3 + Math.random() * 0.5, walkPhase: Math.random() * 10,
     drink: 0, drinkTimer: 0, bubbleUntil: 0, bubbleEl: null,
+    isRemote: false, tx: null, tz: null, trotY: null, _lastMsg: null, _shownMsgAt: 0, _lastDrink: 0,
     pose: { thighL: 0, thighR: 0, shinL: 0, shinR: 0, shL: 0, shR: 0, foreL: 0, foreR: 0, rigY: 0, headX: 0, headY: 0 },
     poseTarget: { thighL: 0, thighR: 0, shinL: 0.08, shinR: 0.08, shL: 0.06, shR: 0.06, foreL: -0.1, foreR: -0.1, rigY: 0, headX: 0, headY: 0 },
   };
@@ -677,6 +879,7 @@ function sitDown(c, seat, instant = false) {
   if (instant) {
     c.pose = { ...c.poseTarget, thighL: -1.5, thighR: -1.5, shinL: 1.45, shinR: 1.45, rigY: -0.35, shL: -0.25, shR: -0.25 };
   }
+  if (c.id === 'me') publishMe(true);
 }
 function walkTo(c, x, z, seat = null) {
   if (c.seat) { freeSeat(c.seat); c.seat = null; }
@@ -690,6 +893,7 @@ function walkTo(c, x, z, seat = null) {
   if (Math.abs((pts.length ? pts[0].x : cur.x) - x) > 0.4) pts.push({ x, z: rowZ });
   pts.push({ x, z });
   c.path = pts; c.mode = 'walk';
+  if (c.id === 'me') { if (seat) mySeatAt = Date.now(); publishMe(true); }
 }
 function freeSeatNear(zone) {
   const list = state.seats.filter((s) => !s.occupiedBy && (!zone || s.zone === zone));
@@ -700,8 +904,53 @@ function freeSeatNear(zone) {
 const _v = new THREE.Vector3();
 function updateCharacter(c, dt, t) {
   const p = c.pose, pt = c.poseTarget;
-  // Di chuyển theo đường đi
-  if (c.mode === 'walk' && c.path.length) {
+  // Người thật khác: trượt mượt tới vị trí họ gửi lên Firebase
+  if (c.isRemote) {
+    const dx = (c.tx ?? c.group.position.x) - c.group.position.x;
+    const dz = (c.tz ?? c.group.position.z) - c.group.position.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.12) {
+      const step = Math.min(dist, c.speed * dt * 1.6);
+      c.group.position.x += (dx / dist) * step;
+      c.group.position.z += (dz / dist) * step;
+      const targetRot = Math.atan2(dx, dz);
+      let dr = targetRot - c.group.rotation.y;
+      while (dr > Math.PI) dr -= Math.PI * 2;
+      while (dr < -Math.PI) dr += Math.PI * 2;
+      c.group.rotation.y += dr * Math.min(1, dt * 8);
+      c.walkPhase += dt * 9;
+      const s = Math.sin(c.walkPhase);
+      pt.thighL = s * 0.55; pt.thighR = -s * 0.55;
+      pt.shinL = 0.25 + Math.max(0, -s) * 0.5; pt.shinR = 0.25 + Math.max(0, s) * 0.5;
+      pt.shL = -s * 0.45; pt.shR = s * 0.45;
+      pt.foreL = -0.15; pt.foreR = -0.15;
+      pt.rigY = Math.abs(Math.cos(c.walkPhase)) * 0.045;
+      pt.headX = 0; pt.headY = 0;
+    } else if (c.seat) {
+      pt.thighL = -1.5; pt.thighR = -1.5; pt.shinL = 1.45; pt.shinR = 1.45;
+      pt.shL = -0.25; pt.shR = -0.25; pt.foreL = -0.25; pt.foreR = -0.25;
+      pt.rigY = -0.35 + Math.sin(t * 1.8 + c.walkPhase) * 0.008;
+      pt.headY = Math.sin(t * 0.4 + c.walkPhase) * 0.25;
+      pt.headX = 0;
+      let dr = c.seat.angle - c.group.rotation.y;
+      while (dr > Math.PI) dr -= Math.PI * 2;
+      while (dr < -Math.PI) dr += Math.PI * 2;
+      c.group.rotation.y += dr * Math.min(1, dt * 6);
+    } else {
+      pt.thighL = 0; pt.thighR = 0; pt.shinL = 0.06; pt.shinR = 0.06;
+      pt.shL = 0.06; pt.shR = 0.06; pt.foreL = -0.1; pt.foreR = -0.1;
+      pt.rigY = Math.sin(t * 2 + c.walkPhase) * 0.012;
+      pt.headY = Math.sin(t * 0.35 + c.walkPhase) * 0.3;
+      pt.headX = 0;
+      if (c.trotY !== null && c.trotY !== undefined) {
+        let dr = c.trotY - c.group.rotation.y;
+        while (dr > Math.PI) dr -= Math.PI * 2;
+        while (dr < -Math.PI) dr += Math.PI * 2;
+        c.group.rotation.y += dr * Math.min(1, dt * 6);
+      }
+    }
+  } else if (c.mode === 'walk' && c.path.length) {
+    // Di chuyển theo đường đi
     const target = c.path[0];
     const dx = target.x - c.group.position.x, dz = target.z - c.group.position.z;
     const dist = Math.hypot(dx, dz);
@@ -773,42 +1022,6 @@ function smoothstep(a, b, x) {
 }
 function startDrink(c) { if (!c.drink) { c.drink = 1; c.drinkTimer = 0; } }
 
-/* ---- Bot khách quen ---- */
-function spawnBots(count) {
-  const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-  for (let i = 0; i < count; i++) {
-    const spec = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
-    const seat = freeSeatNear();
-    if (!seat) break;
-    const id = 'bot' + i;
-    // Hầu hết ngồi sẵn cho quán đông ngay, vài người đi bộ từ cửa vào cho có sức sống
-    if (i < 45) {
-      spawnCharacter(id, names[i % names.length], spec, { bot: true, seat });
-    } else {
-      setTimeout(() => {
-        if (state.players.has(id)) return;
-        const b = spawnCharacter(id, names[i % names.length], spec, { bot: true, x: -4 + Math.random() * 8, z: 14 + Math.random() * 2.5 });
-        const s2 = freeSeatNear();
-        if (s2) walkTo(b, s2.x, s2.z, s2);
-      }, 500 * (i - 44));
-    }
-  }
-}
-setInterval(() => {
-  const bots = [...state.players.values()].filter((c) => c.isBot);
-  if (!bots.length) return;
-  const b = bots[Math.floor(Math.random() * bots.length)];
-  const r = Math.random();
-  if (r < 0.5) {
-    say(b.id, BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)]);
-  } else if (r < 0.68 && b.mode === 'sit') {
-    const s = freeSeatNear();
-    if (s) walkTo(b, s.x, s.z, s);
-  } else if (r < 0.85) {
-    startDrink(b);
-  }
-}, 4500);
-
 /* ============ CHAT + BONG BÓNG 3D ============ */
 function escapeHtml(s) { return s.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])); }
 function log(html, cls = '') {
@@ -820,7 +1033,7 @@ function log(html, cls = '') {
   while (box.children.length > 80) box.removeChild(box.firstChild);
   box.scrollTop = box.scrollHeight;
 }
-function say(id, text) {
+function showBubble(id, text) {
   const c = state.players.get(id);
   if (!c) return;
   if (!c.bubbleEl) {
@@ -832,27 +1045,32 @@ function say(id, text) {
   c.bubbleEl.innerHTML = `<b>${escapeHtml(c.name)}</b> ${escapeHtml(text)}`;
   c.bubbleEl.style.display = 'block';
   c.bubbleUntil = performance.now() + 5200;
+}
+function say(id, text) {
+  const c = state.players.get(id);
+  if (!c) return;
+  showBubble(id, text);
   log(`<b>${escapeHtml(c.name)}:</b> ${escapeHtml(text)}`, id === 'me' ? 'me' : '');
 }
-const ACK = ['Haha đúng rồi!', 'Chuẩn luôn bạn ơi!', 'Ừ ừ, mình cũng nghĩ vậy.', 'Hay quá!', '👍'];
-function botReplyTo(text) {
-  const low = text.toLowerCase();
-  const hit = REPLIES.find((r) => r.keys.some((k) => low.includes(k)));
-  const bots = [...state.players.values()].filter((c) => c.isBot);
-  if (!bots.length) return;
-  const b = bots[Math.floor(Math.random() * bots.length)];
-  const reply = hit
-    ? hit.text[Math.floor(Math.random() * hit.text.length)].replace('{name}', b.name)
-    : ACK[Math.floor(Math.random() * ACK.length)];
-  setTimeout(() => say(b.id, reply), 1200 + Math.random() * 1400);
+/* Gửi tin nhắn thật cho cả quán qua Firebase */
+function sendMessage(text) {
+  text = (text || '').trim();
+  if (!text || !state.entered) return;
+  say('me', text);
+  const me = state.players.get('me');
+  if (me) me._lastMsg = { text, at: Date.now() };
+  publishMe(true);
+  if (fbReady) {
+    const ref = fbDb.ref(`rooms/${ROOM}/chat`).push({ name: state.myName, text, at: Date.now() });
+    myChatKeys.add(ref.key);
+  }
 }
 function sendChat() {
   const input = $('chat-input');
   const text = input.value.trim();
-  if (!text || !state.entered) return;
+  if (!text) return;
   input.value = '';
-  say('me', text);
-  botReplyTo(text);
+  sendMessage(text);
 }
 $('chat-send').addEventListener('click', sendChat);
 $('chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
@@ -904,8 +1122,8 @@ $('btn-hello').addEventListener('click', () => {
   const c = state.players.get(profileId);
   if (!c) return;
   $('profile').classList.add('hidden');
-  say('me', `Chào ${c.name} nhé! 👋`);
-  setTimeout(() => say(c.id, `Chào ${state.myName}! Ngồi xuống đây chơi với mình nè 😊`), 1300);
+  // Gửi lời chào thật vào chat chung — người kia sẽ thấy
+  sendMessage(`Chào ${c.name} nhé! 👋`);
 });
 $('btn-friend').addEventListener('click', () => {
   if (!profileId) return;
@@ -916,7 +1134,6 @@ $('btn-friend').addEventListener('click', () => {
   } else {
     state.friends.add(profileId);
     toast(`Đã kết bạn với ${c.name} 💛`);
-    setTimeout(() => say(profileId, `Mình đồng ý kết bạn với ${state.myName} nè! 🤝`), 1200);
   }
   localStorage.setItem('cafe3d_friends', JSON.stringify([...state.friends]));
   openProfile(profileId, 0, 0);
@@ -945,6 +1162,14 @@ $('tv-play').addEventListener('click', () => {
   else toast('Link YouTube chưa đúng, thử lại nhé');
 });
 $('tv-skip').addEventListener('click', () => {
+  if (fbReady) {
+    if (sharedQueue.length) {
+      const first = sharedQueue[0];
+      fbDb.ref(`rooms/${ROOM}/tv/queue/${first.key}`).remove();
+      setSharedCurrent(first.id, first.by);
+    } else toast('Hết hàng chờ rồi, dán link để thêm video nhé');
+    return;
+  }
   if (tvQueueIndex >= 0 && tvQueueIndex < tvQueue.length - 1) skipToQueue(tvQueueIndex + 1);
   else toast('Hết hàng chờ rồi, dán link để thêm video nhé');
 });
@@ -958,8 +1183,9 @@ $('btn-coffee').addEventListener('click', () => {
   if (!me) return;
   if (me.mode !== 'sit') { toast('Ngồi xuống ghế trống rồi hẵng gọi cà phê nhé ☕'); return; }
   startDrink(me);
-  say('lan', `Cà phê của ${state.myName} đây, mời bạn! ☕`);
-  toast('Cô Lan mang cà phê ra rồi, nhân vật sẽ nâng ly uống ☕');
+  toast('Cà phê của bạn đây, nhân vật sẽ nâng ly uống ☕');
+  publishMe(true);
+  setTimeout(() => publishMe(true), 3000);
 });
 const CAM_MODES = [
   { pos: [0, 15, 24], target: [0, 1, 2], label: 'Toàn cảnh quán' },
@@ -1035,6 +1261,7 @@ function removeCharacter(id) {
     if (clickable[i].userData.charId === id) clickable.splice(i, 1);
   }
   state.players.delete(id);
+  updateOnlineCount();
 }
 function enterCafe() {
   const name = $('player-name').value.trim() || RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
@@ -1048,7 +1275,7 @@ function enterCafe() {
   camera.position.set(0, 9, 20);
   controls.target.set(0, 1, 8);
   log(`<span class="sys">🎉 ${escapeHtml(name)} vừa vào quán! Có ${state.players.size} người đang ở đây.</span>`);
-  setTimeout(() => say('lan', `Chào ${name} đến với Café Kết Bạn! Bấm vào ghế trống để ngồi nhé ☕`), 800);
+  joinFirebase();
   toast('Chào mừng đến quán! Bấm vào ghế trống để ngồi xuống ☕');
   // Bật tiếng ngay trong thao tác bấm "Vào quán" của người dùng: trình duyệt chỉ
   // cho bật tiếng khi có thao tác thật, gọi trong setTimeout hay lúc tải trang
@@ -1060,9 +1287,6 @@ $('btn-enter').addEventListener('click', enterCafe);
 $('player-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') enterCafe(); });
 
 /* ============ KHỞI TẠO QUÁN ============ */
-const LAN_SPEC = { name: 'Cô Lan', gender: 'Nữ', desc: 'Chủ quán, pha cà phê ngon nhất khu.', skin: 0xf2c89b, hair: 0x9a3412, hairStyle: 'bun', shirt: 0x166534, pants: 0x1f2937 };
-spawnCharacter('lan', 'Cô Lan', LAN_SPEC, { x: 12.4, z: -5.5, rotY: -Math.PI / 2 });
-spawnBots(50);
 showPreview(0);
 const savedName = localStorage.getItem('cafe3d_name');
 if (savedName) $('player-name').value = savedName;
@@ -1073,6 +1297,7 @@ if (CHARACTERS[savedChar]) {
   showPreview(savedChar);
 }
 log('<span class="sys">☕ Chào mừng đến Café Kết Bạn 3D — quán có 100 ghế, chọn nhân vật rồi vào chơi nhé!</span>');
+fbInit();
 loadYouTubeAPI();
 renderQueue();
 updateSoundUI();
@@ -1136,6 +1361,11 @@ function animate() {
   const dt = Math.min(clock.getDelta(), FAST ? 0.5 : 0.05);
   const t = clock.elapsedTime;
   for (const c of state.players.values()) updateCharacter(c, dt, t);
+  // Gửi vị trí của mình lên Firebase khi đang đi (giới hạn 4 lần/giây)
+  if (state.entered) {
+    const me = state.players.get('me');
+    if (me && me.mode === 'walk') publishMe();
+  }
   tvTimer += dt;
   if (tvTimer > 0.12) { tvTimer = 0; drawTV(t); }
   // Bong bóng chat bám theo đầu nhân vật 3D
