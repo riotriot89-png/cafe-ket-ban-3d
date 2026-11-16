@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Café Kết Bạn 3D — Quán cà phê kết bạn</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="scene-container"></div>
+<div id="bubbles"></div>
+
+<header id="topbar">
+  <div class="logo">☕ <b>Café Kết Bạn</b> <span class="tag3d">3D</span></div>
+  <div class="top-info"><span id="online-count">0/100 đang trong quán</span></div>
+  <div class="top-actions">
+    <button id="btn-tv" title="Mở tivi YouTube">📺 Tivi</button>
+    <button id="btn-coffee" title="Gọi cà phê">☕ Gọi cà phê</button>
+    <button id="btn-cam" title="Đổi góc camera">🎥 Góc nhìn</button>
+    <button id="btn-change-char" title="Đổi nhân vật">🧑 Đổi nhân vật</button>
+  </div>
+</header>
+
+<aside id="chat-panel">
+  <div id="chat-log"></div>
+  <div id="chat-input-row">
+    <input id="chat-input" type="text" maxlength="120" placeholder="Nhắn gì đó với cả quán..." autocomplete="off">
+    <button id="chat-send">Gửi</button>
+  </div>
+</aside>
+
+<div id="hint">🖱️ Kéo để xoay quán &nbsp;•&nbsp; Lăn chuột để zoom &nbsp;•&nbsp; Bấm vào ghế trống để ngồi &nbsp;•&nbsp; Bấm vào người khác để làm quen</div>
+<div id="zone-label"></div>
+
+<div id="profile" class="hidden">
+  <button id="profile-close">✕</button>
+  <div id="profile-color"></div>
+  <h3 id="profile-name">—</h3>
+  <p id="profile-desc">—</p>
+  <div class="profile-actions">
+    <button id="btn-hello">👋 Chào</button>
+    <button id="btn-friend">🤝 Kết bạn</button>
+  </div>
+</div>
+
+<div id="tv-panel" class="hidden">
+  <div class="tv-head">
+    <b>📺 Tivi quán</b>
+    <button id="tv-close">✕ Đóng</button>
+  </div>
+  <iframe id="tv-frame" src="https://www.youtube-nocookie.com/embed/jfKfPfyJRdk?autoplay=1&mute=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+  <div class="tv-controls">
+    <input id="tv-url" type="text" placeholder="Dán link YouTube để đổi video...">
+    <button id="tv-play">Phát</button>
+    <button class="tv-preset" data-vid="jfKfPfyJRdk">🎵 Lofi</button>
+    <button class="tv-preset" data-vid="5qap5aO4i9A">🎵 Lofi 24/7</button>
+    <button class="tv-preset" data-vid="eKFTSSKCzWA">🎤 Nhạc trẻ</button>
+  </div>
+</div>
+
+<div id="welcome">
+  <div class="welcome-card">
+    <h1>☕ Café Kết Bạn <span class="tag3d">3D</span></h1>
+    <p class="welcome-sub">Quán cà phê 3D cho 100 người — chọn nhân vật, vào quán, ngồi xuống và làm quen!</p>
+    <label class="field-label">Tên của bạn</label>
+    <div class="name-row">
+      <input id="player-name" type="text" maxlength="20" placeholder="Nhập tên của bạn...">
+      <button id="btn-random">🎲 Ngẫu nhiên</button>
+    </div>
+    <label class="field-label">Chọn nhân vật 3D</label>
+    <div id="char-preview-wrap"><canvas id="char-preview" width="280" height="280"></canvas></div>
+    <div id="char-grid"></div>
+    <button id="btn-enter">Vào quán →</button>
+    <p class="welcome-note">Chưa cần đăng nhập • Quán có 100 ghế: sảnh chính, sân vườn, lounge</p>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
