@@ -12,7 +12,7 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   có khớp tay chân — đi bộ, ngồi xuống ghế, nâng ly uống cà phê, thở và quay đầu.
   Màn chọn nhân vật có xem trước 3D xoay vòng.
 - **Chat bong bóng 3D**: bong bóng bám theo đầu nhân vật, kèm log chat.
-- **Tivi YouTube**: màn hình lớn trên tường, bấm vào để mở trình phát, dán link đổi video.
+- **Tivi YouTube**: màn hình lớn trên tường, bấm vào để mở trình phát, dán link đổi video. Từ 2026-11-17 video chiếu thật lên màn hình tivi 3D trong game (CSS3DRenderer): bấm vào tivi hoặc nút "Chiếu lên màn hình 3D" để bật, bấm "✕ Tắt màn hình 3D" để tắt, lúc tắt màn hình hiện sóng nhạc.
 - **Kết bạn**: bấm vào người khác để xem hồ sơ, chào và kết bạn (lưu localStorage).
 - **Camera**: kéo xoay, lăn chuột zoom, nút đổi góc nhìn (toàn cảnh / theo bạn / tivi).
 - **Bot khách quen**: ~50 bot tự đi lại, đổi bàn, trò chuyện và trả lời bạn.
