@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 
 /* ============ DỮ LIỆU ============ */
 const CHARACTERS = [
@@ -49,6 +50,7 @@ const state = {
   seats: [],          // {id, table, zone, x, z, angle, occupiedBy, cup}
   friends: new Set(JSON.parse(localStorage.getItem('cafe3d_friends') || '[]')),
   videoId: 'jfKfPfyJRdk', videoTitle: 'Lofi Girl — beats to relax/study to',
+  tv3d: false, // màn hình tivi 3D có đang chiếu video thật không
   camMode: 0, // 0 toàn cảnh, 1 theo mình, 2 tivi
 };
 const $ = (id) => document.getElementById(id);
@@ -78,7 +80,18 @@ controls.dampingFactor = 0.08;
 controls.minDistance = 5;
 controls.maxDistance = 38;
 controls.maxPolarAngle = 1.48;
+controls.minAzimuthAngle = -1.35;
+controls.maxAzimuthAngle = 1.35;
 controls.update();
+
+// Renderer CSS3D: chiếu video YouTube thật lên màn hình tivi trong game
+const cssRenderer = new CSS3DRenderer();
+cssRenderer.setSize(innerWidth, innerHeight);
+cssRenderer.domElement.style.position = 'absolute';
+cssRenderer.domElement.style.top = '0';
+cssRenderer.domElement.style.left = '0';
+cssRenderer.domElement.style.pointerEvents = 'none';
+container.appendChild(cssRenderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x3a2a1e, 0.85));
 const sun = new THREE.DirectionalLight(0xffe7c2, 1.6);
@@ -210,6 +223,41 @@ function drawTV(t) {
   g.font = '24px Arial'; g.fillStyle = '#94a3b8';
   g.fillText('Bấm vào tivi để mở trình phát', W / 2, 250);
   tvTexture.needsUpdate = true;
+}
+
+/* ---- Màn hình tivi 3D: iframe YouTube thật đặt đúng chỗ màn hình trong game ---- */
+const tv3dEl = document.createElement('div');
+tv3dEl.style.width = '720px';
+tv3dEl.style.height = '405px';
+tv3dEl.style.background = '#000';
+const tv3dFrame = document.createElement('iframe');
+tv3dFrame.style.width = '100%';
+tv3dFrame.style.height = '100%';
+tv3dFrame.style.border = 'none';
+tv3dFrame.style.pointerEvents = 'auto';
+tv3dFrame.allow = 'autoplay; encrypted-media; picture-in-picture';
+tv3dFrame.allowFullscreen = true;
+tv3dEl.appendChild(tv3dFrame);
+const tv3dObj = new CSS3DObject(tv3dEl);
+tv3dObj.position.set(0, 3.1, -9.64);
+tv3dObj.scale.set(0.01, 0.01, 0.01);
+tv3dObj.visible = false;
+scene.add(tv3dObj);
+function tv3dUrl() {
+  return `https://www.youtube-nocookie.com/embed/${state.videoId}?autoplay=1&mute=1`;
+}
+function setTv3D(on) {
+  state.tv3d = on;
+  tv3dObj.visible = on;
+  $('tv3d-close').classList.toggle('hidden', !on);
+  if (on) {
+    if (tv3dFrame.getAttribute('src') !== tv3dUrl()) tv3dFrame.src = tv3dUrl();
+    $('tv-3d-toggle').textContent = '📺 Tắt màn hình 3D';
+    toast('Video đang chiếu lên màn hình tivi trong quán 📺');
+  } else {
+    tv3dFrame.src = 'about:blank';
+    $('tv-3d-toggle').textContent = '📺 Chiếu lên màn hình 3D';
+  }
 }
 
 /* ============ QUẦY + GHẾ BAR ============ */
@@ -663,7 +711,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   const o = hits[0].object;
   const me = state.players.get('me');
   if (o.userData.charId && o.userData.charId !== 'me') { openProfile(o.userData.charId, e.clientX, e.clientY); return; }
-  if (o.userData.isTV) { openTV(); return; }
+  if (o.userData.isTV) { setTv3D(true); openTV(); return; }
   if (o.userData.seat) {
     const s = o.userData.seat;
     if (s.occupiedBy && s.occupiedBy !== 'me') { toast('Ghế này đã có người ngồi rồi, chọn ghế khác nhé'); return; }
@@ -721,11 +769,14 @@ function setVideo(id, title) {
   state.videoId = id;
   state.videoTitle = title || 'Video YouTube';
   $('tv-frame').src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1`;
+  if (state.tv3d) tv3dFrame.src = tv3dUrl();
   drawTV(0);
 }
 function openTV() { $('tv-panel').classList.remove('hidden'); }
 $('btn-tv').addEventListener('click', openTV);
 $('tv-close').addEventListener('click', () => $('tv-panel').classList.add('hidden'));
+$('tv-3d-toggle').addEventListener('click', () => setTv3D(!state.tv3d));
+$('tv3d-close').addEventListener('click', () => setTv3D(false));
 $('tv-play').addEventListener('click', () => {
   const id = extractVideoId($('tv-url').value.trim());
   if (id) { setVideo(id, 'Video bạn chọn'); toast('Đã đổi video trên tivi 📺'); }
@@ -939,6 +990,19 @@ function animate() {
   }
   controls.update();
   renderer.render(scene, camera);
+  cssRenderer.render(scene, camera);
+  // Nút tắt màn hình 3D bám theo góc phải của tivi
+  if (state.tv3d) {
+    _pv.set(3.9, 5.35, -9.6);
+    _pv.project(camera);
+    const btn = $('tv3d-close');
+    if (_pv.z > 1) { btn.style.display = 'none'; }
+    else {
+      btn.style.display = 'block';
+      btn.style.left = ((_pv.x * 0.5 + 0.5) * innerWidth) + 'px';
+      btn.style.top = ((-_pv.y * 0.5 + 0.5) * innerHeight) + 'px';
+    }
+  }
   if (pvChar && !$('welcome').classList.contains('hidden')) {
     pvChar.group.rotation.y += dt * 0.8;
     pvRenderer.render(pvScene, pvCam);
@@ -951,6 +1015,7 @@ window.__cafeDebug = () => [...state.players.values()].map((c) => ({
   id: c.id, mode: c.mode, x: +c.group.position.x.toFixed(1), z: +c.group.position.z.toFixed(1),
   path: c.path.length, seat: c.seat ? c.seat.id : null, drink: c.drink,
 }));
+window.__cafeTV = { on: () => setTv3D(true), off: () => setTv3D(false), isOn: () => state.tv3d };
 window.__cafeFps = () => new Promise((res) => {
   let n = 0; const t0 = performance.now();
   const tick = () => { n++; if (performance.now() - t0 < 5000) requestAnimationFrame(tick); else res(+(n / 5).toFixed(1)); };
@@ -961,4 +1026,5 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  cssRenderer.setSize(innerWidth, innerHeight);
 });

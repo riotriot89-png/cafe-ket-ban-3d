@@ -10,7 +10,8 @@
 {
   "imports": {
     "three": "./vendor/three.module.js",
-    "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+    "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+    "three/addons/renderers/CSS3DRenderer.js": "./vendor/CSS3DRenderer.js"
   }
 }
 </script>
@@ -39,6 +40,7 @@
 </aside>
 
 <div id="hint">🖱️ Kéo để xoay quán &nbsp;•&nbsp; Lăn chuột để zoom &nbsp;•&nbsp; Bấm vào ghế trống để ngồi &nbsp;•&nbsp; Bấm vào người khác để làm quen</div>
+<button id="tv3d-close" class="hidden">✕ Tắt màn hình 3D</button>
 <div id="zone-label"></div>
 
 <div id="profile" class="hidden">
@@ -61,6 +63,7 @@
   <div class="tv-controls">
     <input id="tv-url" type="text" placeholder="Dán link YouTube để đổi video...">
     <button id="tv-play">Phát</button>
+    <button id="tv-3d-toggle">📺 Chiếu lên màn hình 3D</button>
     <button class="tv-preset" data-vid="jfKfPfyJRdk">🎵 Lofi</button>
     <button class="tv-preset" data-vid="5qap5aO4i9A">🎵 Lofi 24/7</button>
     <button class="tv-preset" data-vid="eKFTSSKCzWA">🎤 Nhạc trẻ</button>
