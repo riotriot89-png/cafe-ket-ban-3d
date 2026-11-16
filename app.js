@@ -27,8 +27,10 @@ const state = {
 };
 const $ = (id) => document.getElementById(id);
 
-/* Chế độ nhẹ cho máy yếu: ?lowfx=1 (tắt bóng đổ, pixel ratio 1) */
-const LOWFX = new URLSearchParams(location.search).has('lowfx');
+/* Điện thoại: tự bật chế độ nhẹ (tắt bóng đổ, pixel ratio 1) cho mượt */
+const IS_MOBILE = matchMedia('(pointer: coarse)').matches || innerWidth < 700;
+const IS_PORTRAIT = innerHeight > innerWidth;
+const LOWFX = new URLSearchParams(location.search).has('lowfx') || IS_MOBILE;
 
 /* ============ FIREBASE — NGƯỜI THẬT CHƠI CHUNG ============
    Quán không còn bot: mọi người trong quán đều là người thật, đồng bộ qua
@@ -224,8 +226,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x14102b);
 scene.fog = new THREE.Fog(0x14102b, 45, 90);
 
-const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
-camera.position.set(0, 15, 24);
+const camera = new THREE.PerspectiveCamera(IS_MOBILE && IS_PORTRAIT ? 68 : 55, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, IS_MOBILE ? 12 : 15, IS_MOBILE ? 19 : 24);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(LOWFX ? 1 : Math.min(devicePixelRatio, 2));
@@ -1061,8 +1063,11 @@ function sendMessage(text) {
   if (me) me._lastMsg = { text, at: Date.now() };
   publishMe(true);
   if (fbReady) {
-    const ref = fbDb.ref(`rooms/${ROOM}/chat`).push({ name: state.myName, text, at: Date.now() });
+    // Tạo key trước rồi mới ghi: SDK phát sự kiện local ngay trong set(),
+    // nếu add key sau set() thì tin của chính mình sẽ hiện 2 lần trong log.
+    const ref = fbDb.ref(`rooms/${ROOM}/chat`).push();
     myChatKeys.add(ref.key);
+    ref.set({ name: state.myName, text, at: Date.now() });
   }
 }
 function sendChat() {
@@ -1074,16 +1079,24 @@ function sendChat() {
 }
 $('chat-send').addEventListener('click', sendChat);
 $('chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+/* Điện thoại: chat thu gọn thành nút 💬 nổi, bấm mới mở để khỏi che màn hình */
+if (matchMedia('(max-width: 640px)').matches) $('chat-panel').classList.add('mobile-hidden');
+$('btn-chat-toggle').addEventListener('click', () => {
+  const p = $('chat-panel');
+  p.classList.toggle('mobile-hidden');
+  if (!p.classList.contains('mobile-hidden')) $('chat-input').focus();
+});
 
 /* ============ CLICK TRONG QUÁN 3D ============ */
 const ray = new THREE.Raycaster();
 const ptr = new THREE.Vector2();
 floor.userData.floor = true; terraceFloor.userData.floor = true;
 clickable.push(floor, terraceFloor, tvScreen);
-let downX = 0, downY = 0;
-renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; });
+let downX = 0, downY = 0, downType = 'mouse';
+renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; downType = e.pointerType; });
 renderer.domElement.addEventListener('pointerup', (e) => {
-  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return;
+  // Cảm ứng: cho phép lệch nhiều hơn khi xoay quán để khỏi bấm nhầm ghế
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > (downType === 'touch' ? 14 : 6)) return;
   if (!state.entered) return;
   ptr.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   ray.setFromCamera(ptr, camera);
@@ -1114,7 +1127,8 @@ function openProfile(id, x, y) {
   $('btn-friend').textContent = state.friends.has(id) ? '💔 Hủy kết bạn' : '🤝 Kết bạn';
   const p = $('profile');
   p.classList.remove('hidden');
-  p.style.left = Math.min(x + 12, innerWidth - 270) + 'px';
+  const pw = Math.min(250, innerWidth - 24);
+  p.style.left = Math.max(12, Math.min(x + 12, innerWidth - pw - 12)) + 'px';
   p.style.top = Math.min(y + 12, innerHeight - 220) + 'px';
 }
 $('profile-close').addEventListener('click', () => $('profile').classList.add('hidden'));
@@ -1195,7 +1209,10 @@ const CAM_MODES = [
 $('btn-cam').addEventListener('click', () => {
   state.camMode = (state.camMode + 1) % CAM_MODES.length;
   const m = CAM_MODES[state.camMode];
-  if (m.pos) { camera.position.set(...m.pos); controls.target.set(...m.target); }
+  if (m.pos) {
+    const pos = (state.camMode === 0 && IS_MOBILE) ? [0, 12, 19] : m.pos;
+    camera.position.set(...pos); controls.target.set(...m.target);
+  }
   toast('Góc nhìn: ' + m.label);
 });
 $('btn-change-char').addEventListener('click', () => {
@@ -1272,7 +1289,7 @@ function enterCafe() {
   state.entered = true;
   localStorage.setItem('cafe3d_name', name);
   localStorage.setItem('cafe3d_char', String(state.myChar));
-  camera.position.set(0, 9, 20);
+  camera.position.set(0, IS_MOBILE ? 8 : 9, IS_MOBILE ? 15 : 20);
   controls.target.set(0, 1, 8);
   log(`<span class="sys">🎉 ${escapeHtml(name)} vừa vào quán! Có ${state.players.size} người đang ở đây.</span>`);
   joinFirebase();
@@ -1425,4 +1442,5 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   cssRenderer.setSize(innerWidth, innerHeight);
+  if (innerWidth > 640) $('chat-panel').classList.remove('mobile-hidden');
 });
