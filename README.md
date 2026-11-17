@@ -25,14 +25,26 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   (snapback đen vành đỏ có logo, hoodie kem túi kangaroo đỏ, quần cargo rêu có túi hộp,
   giày sneaker trắng đế đỏ); **Luna (nữ)**: bộ Chic (mũ beret hồng, nơ hồng, tóc dài mái ngang,
   áo trắng cổ bèo, váy xòe hồng có thắt lưng, túi xách chéo vàng, tất trắng dài, giày búp bê).
-  Đầu to, mắt to, má hồng, miệng cười — đi bộ, ngồi xuống ghế, nâng ly uống cà phê, thở,
-  chớp mắt, quay đầu. Bóng dưới chân là bóng mềm (gradient mờ dần) chứ không phải đĩa đen cứng.
+  Mặt có hồn: mắt to (tròng trắng + mống mắt màu + con ngươi + điểm sáng + mi trên),
+  lông mày, mũi nhỏ, má hồng mờ, miệng cười; thân thon có eo (lathe), bàn tay tròn,
+  giày bo tròn, váy xòe/váy liền tiện bằng lathe — không còn là khối hộp vuông.
+  Đi bộ, ngồi xuống ghế, nâng ly uống cà phê, thở, chớp mắt, quay đầu. Bóng dưới chân
+  là bóng mềm (gradient mờ dần, hơi bầu dục, lệch ngược hướng mặt trời) chứ không
+  phải đĩa đen cứng.
   Uống trà/cà phê kiểu thật: tay với xuống bàn cầm ly lên, đưa lên miệng uống từng ngụm
   rồi đặt ly xuống bàn (bình thường tay không cầm ly). Ly đặt trên bàn ngay trước mặt
   người ngồi nên tay với tới bàn là khớp.
   Màn chọn nhân vật có xem trước 3D xoay vòng. Trang phục được tách thành bảng dữ
   liệu `OUTFITS` trong app.js: thêm bộ đồ mới cho người chơi mua chỉ cần thêm 1 entry,
   không phải sửa code dựng nhân vật.
+- **Đồ họa (thiết kế lại 2026-11-17)**: không còn màu phẳng + khối vuông. Ánh sáng điện
+  ảnh (tone mapping ACES + environment RoomEnvironment qua PMREM) cho vật liệu có phản
+  xạ thật; texture vẽ bằng canvas — sàn gỗ có vân + mắt gỗ, tường thạch cao, tường gạch
+  sau quầy bar, mặt quầy đá cẩm thạch, sofa vải dệt, thảm hoa văn, mặt bàn vân gỗ tỏa
+  tròn, sân vườn lát đá. Nội thất tiện bằng lathe (chân bàn đế loe thân thon, chao đèn
+  chuông, chậu cây, chai lọ) và ghế lưng cong ôm lưng + đệm vải bo tròn + chân thon xòe,
+  sofa đệm bo tròn, quầy bar có kệ chai + máy pha espresso. Bóng mặt trời thật
+  (PCFSoft, bias/normalBias/radius đã chỉnh) + bóng mềm dưới chân nhân vật.
 - **Tủ đồ (8 bộ)**: mỗi nhân vật có 4 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy
   qua Firebase. Milo: Street, Denim (áo khoác jean + quần jean + tóc ngắn), Thể thao
   (băng đô + tóc xoăn + áo cam + quần đùi), Mùa đông (mũ len + áo len cổ lọ + bốt).
