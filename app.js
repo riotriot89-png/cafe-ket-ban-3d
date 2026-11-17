@@ -2834,12 +2834,14 @@ function animate() {
     const distChar = _cc.length();
     const cos = _ct.normalize().dot(_cc.normalize());
     // Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì mờ đi.
-    // RIÊNG nhân vật của mình ở góc theo chân thì KHÔNG bao giờ mờ nữa:
-    // trước đây ép mờ 0.12 nên vào quán là mình tàng hình luôn (chỉ còn
-    // bóng mờ + tên). Giờ điểm nhìn đã dời ra trước mặt (xem nhánh theo chân
-    // bên dưới) nên nhân vật hiện ở nửa dưới màn hình, thấy rõ người mà
-    // không che tivi — không cần mờ. Các góc khác vẫn mờ theo hình học như cũ.
-    const blocking = (c.id === 'me' && state.camMode === 1) ? false : (cos > 0.9 && distChar < distTarget - 1.5);
+    // NHƯNG ở góc theo chân (camMode 1) thì KHÔNG mờ ai cả: điểm nhìn chỉ
+    // cách nhân vật của mình 2,5m, nên bất cứ ai đứng trước mặt mình cũng
+    // nằm giữa camera và điểm nhìn -> bị tính là "chắn" và mờ còn 0.12,
+    // thành ra người khác tàng hình hết (Hoàng Phúc trong ảnh người dùng
+    // gửi). Ở góc này người trước mặt chính là người mình muốn thấy, nên
+    // tắt hẳn làm mờ. Các góc khác (toàn cảnh/tivi/thứ nhất) điểm nhìn xa,
+    // vẫn mờ theo hình học như cũ để khỏi che tivi.
+    const blocking = state.camMode === 1 ? false : (cos > 0.9 && distChar < distTarget - 1.5);
     const target = blocking ? 0.12 : 1;
     c._fade = (c._fade ?? 1) + (target - (c._fade ?? 1)) * Math.min(1, dt * 8);
     for (const m of c.mats) {
@@ -2955,6 +2957,12 @@ window.__cafeCam = (x, y, z, tx, ty, tz) => {
   controls.minDistance = 0.5; // cho phép camera lại gần để chụp cận mặt (mặc định min 5m)
   camera.position.set(x, y, z);
   controls.target.set(tx, ty, tz);
+};
+window.__cafeSpawn = (id, name, char, x, z) => { // debug: giả lập người khác vào quán (để test đồng bộ/mờ)
+  const base = CHARACTERS[char] || CHARACTERS[0];
+  const c = spawnCharacter(id, name, base, { x, z, rotY: 0 });
+  c.isRemote = true; c.tx = x; c.tz = z; c.trotY = 0;
+  return c.id;
 };
 window.__cafeDebug = () => [...state.players.values()].map((c) => ({
   id: c.id, mode: c.mode, x: +c.group.position.x.toFixed(1), z: +c.group.position.z.toFixed(1),
