@@ -1068,7 +1068,15 @@ function buildCharacter(spec) {
   // Bóng dưới chân
   const shadowDisc = new THREE.Mesh(new THREE.CircleGeometry(0.36, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
   shadowDisc.rotation.x = -Math.PI / 2; shadowDisc.position.y = 0.01; group.add(shadowDisc);
-  return { group, rig, parts: { body, head, legL, legR, armL, armR, cupG } };
+  // Thu thập chất liệu riêng của nhân vật để làm mờ khi che tầm nhìn
+  const mats = [];
+  group.traverse((o) => {
+    if (o.isMesh && o.material && o.material !== MAT.cupWhite && o.material !== MAT.coffee && !mats.includes(o.material)) {
+      o.material.baseOpacity = o.material.opacity;
+      mats.push(o.material);
+    }
+  });
+  return { group, rig, mats, parts: { body, head, legL, legR, armL, armR, cupG } };
 }
 
 function spawnCharacter(id, name, spec, opts = {}) {
@@ -1628,11 +1636,29 @@ const FAST = new URLSearchParams(location.search).has('fast');
 const clock = new THREE.Clock();
 let tvTimer = 0;
 const _pv = new THREE.Vector3();
+const _ct = new THREE.Vector3();
+const _cc = new THREE.Vector3();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), FAST ? 0.5 : 0.05);
   const t = clock.elapsedTime;
   for (const c of state.players.values()) updateCharacter(c, dt, t);
+  // Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì mờ đi,
+  // để xoay góc nhìn thoải mái mà không bị nhân vật che màn hình
+  for (const c of state.players.values()) {
+    _ct.copy(controls.target).sub(camera.position);
+    const distTarget = _ct.length();
+    _cc.set(c.group.position.x, c.group.position.y + 0.9, c.group.position.z).sub(camera.position);
+    const distChar = _cc.length();
+    const cos = _ct.normalize().dot(_cc.normalize());
+    const blocking = distChar < 6 && cos > 0.9 && distChar < distTarget - 1.5;
+    const target = blocking ? 0.12 : 1;
+    c._fade = (c._fade ?? 1) + (target - (c._fade ?? 1)) * Math.min(1, dt * 8);
+    for (const m of c.mats) {
+      m.transparent = c._fade < 0.99;
+      m.opacity = (m.baseOpacity ?? 1) * c._fade;
+    }
+  }
   // Gửi vị trí của mình lên Firebase khi đang đi (giới hạn 4 lần/giây)
   if (state.entered) {
     const me = state.players.get('me');
@@ -1682,9 +1708,14 @@ window.__cafeFront = () => {
   camera.position.set(me.group.position.x + Math.sin(a) * 3, 2.4, me.group.position.z + Math.cos(a) * 3);
   controls.target.set(me.group.position.x, 1.2, me.group.position.z);
 };
+window.__cafeCam = (x, y, z, tx, ty, tz) => {
+  state.camMode = 0;
+  camera.position.set(x, y, z);
+  controls.target.set(tx, ty, tz);
+};
 window.__cafeDebug = () => [...state.players.values()].map((c) => ({
   id: c.id, mode: c.mode, x: +c.group.position.x.toFixed(1), z: +c.group.position.z.toFixed(1),
-  path: c.path.length, seat: c.seat ? c.seat.id : null, drink: c.drink,
+  path: c.path.length, seat: c.seat ? c.seat.id : null, drink: c.drink, fade: +(c._fade ?? 1).toFixed(2),
 }));
 window.__cafeTV = { isOn: () => true };
 window.__cafeQueue = {

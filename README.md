@@ -26,6 +26,9 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
 - **Tivi YouTube**: màn hình lớn trên tường (luôn bật, không bấm tương tác được). Video chiếu thật lên màn hình tivi 3D trong game (CSS3DRenderer), tự tắt phụ đề và thanh điều khiển. Dán link YouTube để thêm vào hàng chờ chung cả quán — hết video này tự phát video người sau. Âm thanh chỉnh riêng từng người (nút loa trên thanh trên cùng + thanh trượt trong bảng tivi).
 - **Kết bạn**: bấm vào người khác để xem hồ sơ, chào và kết bạn (lưu localStorage).
 - **Camera**: kéo xoay, lăn chuột zoom, nút đổi góc nhìn (toàn cảnh / theo bạn / tivi).
+  Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì tự mờ đi (chỉ còn ~12%
+  độ đậm) để không che màn hình; xoay camera ra chỗ khác thì nhân vật hiện lại
+  bình thường.
 
 ## Chơi chung thật (người thật, không bot)
 
