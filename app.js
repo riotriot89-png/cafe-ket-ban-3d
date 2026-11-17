@@ -6,14 +6,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { TEX } from './vendor/textures.js'; // texture ảnh thật (sàn gỗ, gạch, đá, cỏ) dạng base64
 
-/* ---- Nhân vật GLB thật tải trên mạng (Jake + Miku) ----
+/* ---- Nhân vật GLB thật tải trên mạng (Jake + Miku + Aria) ----
    Mỗi nhân vật là 1 file GLB duy nhất (đã gộp Idle + Walk, texture hạ 4K->2K):
    - Jake: nam, file Meshy AI "Desolate City Survivor", 24 xương, cao 1,70m
    - Miku: nữ mèo, file Meshy AI "Cat Girl Miku", 24 xương, cao 1,70m
-   Cả 2 đều là 1 mesh liền (quần áo/tai/đuôi/gậy dính liền, không tách được),
+   - Aria: nữ tóc vàng đội vương miện, file FBX Mixamo "Female Start
+     Walking" (người dùng gửi): 33 xương mixamorig đã đổi tên bỏ tiền tố,
+     mesh giảm 60.000 -> 12.000 đỉnh, tô màu theo nhóm xương, clip Walk đã
+     bỏ root motion, scale về cao 1,70m. Xương tên trùng Jake/Miku nên
+     ngồi/uống bằng code dùng chung được.
+   Cả 3 đều là 1 mesh liền (quần áo/phụ kiện dính liền, không tách được),
    mặt hướng +Z. Tải trước ở nền để lúc chọn nhân vật là có ngay. */
-const GLB_FILES = { jake: './vendor/jake.glb', miku: './vendor/miku.glb' };
-const glbData = { jake: null, miku: null };
+const GLB_FILES = { jake: './vendor/jake.glb', miku: './vendor/miku.glb', aria: './vendor/aria.glb' };
+const glbData = { jake: null, miku: null, aria: null };
 const glbPromises = {};
 for (const [key, url] of Object.entries(GLB_FILES)) {
   glbPromises[key] = new Promise((resolve) => {
@@ -25,12 +30,13 @@ for (const [key, url] of Object.entries(GLB_FILES)) {
 }
 
 /* ============ DỮ LIỆU ============ */
-/* CHỈ 2 nhân vật — Jake (nam) và Miku (nữ), đều là model GLB thật.
+/* 3 nhân vật — Jake (nam), Miku (nữ) và Aria (nữ), đều là model GLB thật.
    Milo/Luna/Chibi đã gỡ khỏi màn chào (code dựng nhân vật procedural
    Milo/Luna vẫn còn trong file nhưng không còn lựa chọn nào dùng tới). */
 const CHARACTERS = [
   { name: 'Jake', gender: 'Nam', outfit: 'glb', outfitId: 'default', desc: 'Người sống sót thành phố hoang tàn, áo da nâu, gậy bóng chày.', glb: 'jake' },
   { name: 'Miku', gender: 'Nữ', outfit: 'glb', outfitId: 'default', desc: 'Mèo trắng tai mèo, áo hồng dấu chân mèo, đuôi dài.', glb: 'miku' },
+  { name: 'Aria', gender: 'Nữ', outfit: 'glb', outfitId: 'default', desc: 'Tóc vàng đội vương miện, áo khoác trắng, bốt nâu cao.', glb: 'aria', faceFlip: true },
 ];
 
 /* ---- Hệ thống trang phục (dữ liệu, không phải code cứng) ----
@@ -1767,6 +1773,11 @@ function buildOutfit(spec, outfit, P, M) {
 function buildGLBCharacter(spec) {
   const group = new THREE.Group();
   const model = SkeletonUtils.clone(glbData[spec.glb].scene);
+  // Aria: model gốc quay mặt về -Z (ngược Jake/Miku) — đã kiểm chứng bằng
+  // ảnh ngang tầm mắt: ngồi ghế quay lưng về tivi. Xoay model 180° để mặt
+  // hướng +Z như 2 nhân vật kia (xương/animation theo model nên không ảnh
+  // hưởng ngồi/uống/đi).
+  if (spec.faceFlip) model.rotation.y = Math.PI;
   group.add(model);
   // Tìm xương cần dùng (tên xương Jake và Miku giống hệt nhau)
   const bones = {};
@@ -2040,7 +2051,9 @@ function updateGLBCharacter(c, dt) {
   // Trạng thái báo ra ngoài (hook __cafePose/__cafeDebug đọc)
   c._curAnim = c.drink > 0 ? 'Drink' : c.mode === 'sit' ? 'Sit' : clip;
   // Ngồi: đùi gập về trước -1.5, cẳng gập +1.45 (cẳng gần như đứng thẳng),
-  // hông hạ từ ~0.95 xuống ~0.48 (vừa tầm ghế). Lerp mượt theo _sitK.
+  // hông hạ xuống đúng tầm ghế (y ~0,48) bất kể hông cao bao nhiêu:
+  // Jake/Miku hông 0,95 -> hạ 0,47 như cũ; Aria hông ~0,86 -> hạ ít hơn.
+  // Lerp mượt theo _sitK.
   const kSit = 1 - Math.exp(-dt * 9);
   c._sitK = (c._sitK ?? 0) + ((c.mode === 'sit' ? 1 : 0) - (c._sitK ?? 0)) * kSit;
   glbPoseTo(c, 'thighL', -1.5, c._sitK);
@@ -2048,7 +2061,7 @@ function updateGLBCharacter(c, dt) {
   glbPoseTo(c, 'shinL', 1.45, c._sitK);
   glbPoseTo(c, 'shinR', 1.45, c._sitK);
   if (c.bones?.Hips) {
-    const targetY = c.hipsRestY - 0.47 * (c._sitK ?? 0);
+    const targetY = 0.48 + (c.hipsRestY - 0.48) * (1 - (c._sitK ?? 0));
     c.bones.Hips.position.y += (targetY - c.bones.Hips.position.y) * kSit;
   }
   // Uống: tay phải đưa ly lên miệng theo đúng keyframe của quán (3,6s).
