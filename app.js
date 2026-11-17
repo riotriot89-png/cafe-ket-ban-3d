@@ -1883,6 +1883,9 @@ function checkOrientation() {
 addEventListener('orientationchange', () => setTimeout(checkOrientation, 300));
 
 /* ---- Cài đặt game (PWA): nút "Cài đặt game" ở màn chào ---- */
+// iOS: iPadOS 13+ báo userAgent là Macintosh nên phải nhận diện thêm bằng cảm ứng
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_IOS_SAFARI = IS_IOS && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
 let deferredInstall = null;
 addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -1895,14 +1898,19 @@ $('btn-install').addEventListener('click', async () => {
     await deferredInstall.userChoice;
     deferredInstall = null;
     $('btn-install').classList.add('hidden');
-  } else if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-    toast('iPhone: bấm nút Chia sẻ ⤴️ rồi chọn "Thêm vào Màn hình chính"');
+  } else if (IS_IOS) {
+    // iOS không có beforeinstallprompt nên không cài trực tiếp được: hiện bảng hướng
+    // dẫn từng bước (toast 3 giây dễ trôi mất nên người dùng tưởng nút không cài được)
+    $('ios-install-nonsafari').classList.toggle('hidden', IS_IOS_SAFARI);
+    $('ios-install').classList.remove('hidden');
   } else {
     toast('Mở menu trình duyệt rồi chọn "Thêm vào Màn hình chính"');
   }
 });
+$('ios-install-close').addEventListener('click', () => $('ios-install').classList.add('hidden'));
+$('ios-install').addEventListener('click', (e) => { if (e.target.id === 'ios-install') $('ios-install').classList.add('hidden'); });
 // iOS không có beforeinstallprompt nên hiện nút luôn để hướng dẫn cách cài
-if (/iPhone|iPad|iPod/.test(navigator.userAgent)) $('btn-install').classList.remove('hidden');
+if (IS_IOS) $('btn-install').classList.remove('hidden');
 if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }

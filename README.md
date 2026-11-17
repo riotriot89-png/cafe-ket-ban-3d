@@ -78,6 +78,12 @@ người này đi lại/chat thì người kia thấy ngay.
   chọn "Thêm vào Màn hình chính". Sau khi cài, game mở toàn màn hình, có icon
   riêng trên màn hình chính, khóa xoay ngang và chạy được cả khi mất mạng
   (bản đã lưu trong bộ nhớ đệm).
+- **iOS không cho cài trực tiếp** (Apple không có `beforeinstallprompt` như
+  Android) nên nút "Cài đặt game" trên iPhone mở bảng hướng dẫn 3 bước
+  (Chia sẻ ⤴️ → "Thêm vào Màn hình chính" → "Thêm") thay vì chỉ hiện toast
+  3 giây dễ trôi mất. Nếu mở bằng Chrome/Firefox trên iOS thì bảng sẽ nhắc
+  phải mở bằng Safari mới cài được. Nút cũng hiện trên iPad (iPadOS báo
+  userAgent là Macintosh nên nhận diện thêm bằng cảm ứng).
 
 Lưu ý: database đang ở **test mode** (mở toàn quyền đọc/ghi, hết hạn sau 30 ngày kể
 từ lúc tạo). Trước khi hết hạn, vào Firebase Console → Realtime Database → Rules
