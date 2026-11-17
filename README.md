@@ -8,12 +8,14 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
 - **Quán 3D kiểu gaming**: sàn gỗ, tường neon, bảng hiệu phát sáng, quầy bar,
   sân vườn có dây đèn, góc lounge có sofa và thảm.
 - **100 ghế** chia 3 khu: Sảnh chính (48 ghế), Sân vườn (32 ghế), Lounge (20 ghế).
-- **Nhân vật 3D chibi đáng yêu**: chỉ 2 nhân vật — **Milo (nam)**: nón lưỡi trai đỏ,
-  áo hoodie kem có túi kangaroo, quần jean, giày thể thao trắng đế đỏ;
-  **Luna (nữ)**: nơ hồng, tóc dài mái ngang, áo trắng cổ bèo, váy xòe hồng,
-  tất trắng, giày búp bê. Đầu to, mắt to, má hồng, miệng cười — đi bộ, ngồi
-  xuống ghế, nâng ly uống cà phê, thở và quay đầu. Màn chọn nhân vật có xem
-  trước 3D xoay vòng.
+- **Nhân vật 3D chibi thời trang, cao ~1,7**: chỉ 2 nhân vật — **Milo (nam)**: bộ Street
+  (snapback đen vành đỏ có logo, hoodie kem túi kangaroo đỏ, quần cargo rêu có túi hộp,
+  giày sneaker trắng đế đỏ); **Luna (nữ)**: bộ Chic (mũ beret hồng, nơ hồng, tóc dài mái ngang,
+  áo trắng cổ bèo, váy xòe hồng có thắt lưng, túi xách chéo vàng, tất trắng dài, giày búp bê).
+  Đầu to, mắt to, má hồng, miệng cười — đi bộ, ngồi xuống ghế, nâng ly uống cà phê, thở và
+  quay đầu. Màn chọn nhân vật có xem trước 3D xoay vòng. Trang phục được tách thành bảng dữ
+  liệu `OUTFITS` trong app.js: thêm bộ đồ mới cho người chơi mua chỉ cần thêm 1 entry,
+  không phải sửa code dựng nhân vật.
 - **Chat bong bóng 3D**: bong bóng bám theo đầu nhân vật, kèm log chat.
 - **Tivi YouTube**: màn hình lớn trên tường (luôn bật, không bấm tương tác được). Video chiếu thật lên màn hình tivi 3D trong game (CSS3DRenderer), tự tắt phụ đề và thanh điều khiển. Dán link YouTube để thêm vào hàng chờ chung cả quán — hết video này tự phát video người sau. Âm thanh chỉnh riêng từng người (nút loa trên thanh trên cùng + thanh trượt trong bảng tivi).
 - **Kết bạn**: bấm vào người khác để xem hồ sơ, chào và kết bạn (lưu localStorage).
