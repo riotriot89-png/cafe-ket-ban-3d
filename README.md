@@ -42,6 +42,17 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   Màn chọn nhân vật có xem trước 3D xoay vòng. Trang phục được tách thành bảng dữ
   liệu `OUTFITS` trong app.js: thêm bộ đồ mới cho người chơi mua chỉ cần thêm 1 entry,
   không phải sửa code dựng nhân vật.
+- **Nhân vật Chibi 3D thật (file `Chibi_Base_Mesh.blend` người dùng gửi)**: thêm lựa chọn
+  thứ 3 ở màn chào — **Chibi**, dùng đúng thân mesh người dùng gửi (đầu to, thân nhỏ,
+  1.954 đỉnh), không phải dựng bằng khối cơ bản. Mesh đã được rig sẵn 20 xương +
+  4 animation làm thêm trong Blender (thở Idle, đi bộ Walk, ngồi Sit, uống Drink)
+  rồi xuất GLB (`vendor/chibi-base-mesh.glb`, 457 KB) tải bằng GLTFLoader +
+  SkeletonUtils.clone (mỗi người chơi 1 bản clone + 1 AnimationMixer riêng, chuyển
+  animation bằng fade 0,25s; Sit/Drink giữ tư thế cuối, Idle/Walk lặp). Mặt (mắt to
+  có điểm sáng + miệng) và tóc nâu đội đầu gắn theo xương Head nên cử động theo đầu;
+  ly cà phê gắn vào tay phải, hiện khi uống. Chibi cao ~1,85 như Milo/Luna (scale 0,7),
+  tên/bong bóng chat bám theo xương đầu, ngồi quay mặt về tivi như nhân vật thường.
+  Milo/Luna (Genshin + 10 bộ đồ) vẫn giữ nguyên để chọn.
 - **Đồ họa (thiết kế lại 2026-11-17, nâng cấp lần 2 cùng ngày)**: không còn màu phẳng +
   khối vuông. Ánh sáng điện ảnh (tone mapping ACES + environment RoomEnvironment qua
   PMREM) cho vật liệu có phản xạ thật; **texture ảnh thật** (vendor/textures.js, base64
