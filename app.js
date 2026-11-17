@@ -314,6 +314,13 @@ const camera = new THREE.PerspectiveCamera(IS_MOBILE && IS_PORTRAIT ? 68 : 55, i
 camera.position.set(0, IS_MOBILE ? 12 : 15, IS_MOBILE ? 19 : 24);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setClearColor(0x000000, 0); // canvas trong suốt: tivi nằm dưới vẫn hiện qua lỗ màn hình
+// Canvas WebGL PHẢI nằm trên lớp video CSS3D (cả hai đều positioned, z-index quyết định
+// thứ tự vẽ — chỉ đổi thứ tự DOM thôi chưa đủ vì div CSS3D absolute luôn vẽ trên
+// canvas static). Nhân vật 3D trong canvas nhờ vậy mới che được video tivi.
+renderer.domElement.style.position = 'absolute';
+renderer.domElement.style.top = '0';
+renderer.domElement.style.left = '0';
+renderer.domElement.style.zIndex = '1';
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(LOWFX ? 1 : Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = !LOWFX;
@@ -340,6 +347,7 @@ cssRenderer.domElement.style.position = 'absolute';
 cssRenderer.domElement.style.top = '0';
 cssRenderer.domElement.style.left = '0';
 cssRenderer.domElement.style.pointerEvents = 'none';
+cssRenderer.domElement.style.zIndex = '0'; // lớp video nằm dưới canvas WebGL (z-index 1)
 container.insertBefore(cssRenderer.domElement, renderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x3a2a1e, 0.85));
@@ -450,9 +458,13 @@ const tvScreen = new THREE.Mesh(
   new THREE.PlaneGeometry(12, 6.75),
   // "Lỗ" màn hình: chỉ ghi depth để che tường sau, không vẽ màu nên canvas trong suốt
   // ở đây và video YouTube (lớp CSS3D nằm dưới canvas) hiện qua; nhân vật 3D đứng
-  // trước tivi sẽ vẽ đè lên video vì canvas WebGL nằm trên lớp CSS3D
+  // trước tivi sẽ vẽ đè lên video vì canvas WebGL nằm trên lớp CSS3D.
+  // renderOrder = -1 để lỗ được vẽ TRƯỚC tường (opaque sort theo material trước
+  // rồi mới theo độ sâu, nên không có renderOrder thì tường vẽ trước và lỗ không
+  // xóa được màu tường đã vẽ).
   new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true })
 );
+tvScreen.renderOrder = -1;
 tvScreen.position.set(0, 3.4, -9.7); tvScreen.userData.isTV = true; scene.add(tvScreen);
 const tvFrame = box(12.4, 7.15, 0.12, MAT.black, 0, 3.4, -9.78); scene.add(tvFrame);
 tvScreen.position.z = -9.7; // nổi lên trước khung

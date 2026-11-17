@@ -16,7 +16,11 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
 - **Tivi nằm dưới nhân vật**: lớp video CSS3D giờ nằm dưới canvas WebGL, màn hình tivi
   trong cảnh 3D là một "lỗ" chỉ ghi depth (không vẽ màu) nên video hiện qua lỗ đó; nhân
   vật 3D đứng trước tivi sẽ vẽ đè lên video (nhân vật che màn hình, không còn bị video
-  đè mất đầu).
+  đè mất đầu). Hai chỗ dễ sai đã sửa: (1) canvas WebGL phải có `position: absolute`
+  + `z-index: 1` (chỉ đổi thứ tự DOM chưa đủ vì div CSS3D absolute luôn vẽ trên
+  canvas static); (2) lỗ màn hình phải có `renderOrder = -1` để được vẽ trước tường
+  (opaque sort theo material trước rồi mới theo độ sâu, nên tường vẽ trước sẽ làm
+  lỗ không xóa được màu tường).
 - **Nhân vật 3D chibi thời trang, cao ~1,7**: chỉ 2 nhân vật — **Milo (nam)**: bộ Street
   (snapback đen vành đỏ có logo, hoodie kem túi kangaroo đỏ, quần cargo rêu có túi hộp,
   giày sneaker trắng đế đỏ); **Luna (nữ)**: bộ Chic (mũ beret hồng, nơ hồng, tóc dài mái ngang,
