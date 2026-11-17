@@ -61,14 +61,20 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
 - **Tủ đồ (10 bộ)**: mỗi nhân vật có 5 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy
   qua Firebase. Milo: Street, Denim (áo khoác jean + quần jean + tóc ngắn), Thể thao
   (băng đô + tóc xoăn + áo cam + quần đùi), Mùa đông (mũ len + áo len cổ lọ + bốt),
-  **Hắc Ám** (áo khoác denim đen + quần cargo đen + bốt đen + hình xăm tribal quấn cẳng tay).
+  **Hắc Ám** (áo khoác denim đen mở để lộ sơ mi trắng + ve áo + dây chuyền bạc có mặt dây
+  + thắt lưng khóa bạc + dây xích treo hông + bốt đen buộc dây + hình xăm tribal quấn cẳng tay
+  + vòng tay bạc).
   Luna: Chic, Denim (tóc bob + áo khoác jean + quần jean), Mùa hè (mũ rộng vành + tóc đuôi
   ngựa + váy liền vàng + dép), Mùa đông (mũ len hồng + tóc búi + áo len + legging + bốt),
-  **Trắng** (váy trắng thắt lưng đen + tất trắng + giày đen).
-  2 bộ Hắc Ám/Trắng học theo pack `14_power_couples.zip` người dùng gửi (phong cách dark/
-  gothic: đồ đen, váy trắng, hình xăm, dây xích) — pack gốc là sprite 2D 444×700 (mỗi món
-  1 lớp PNG trong suốt, có cả bản đen trắng để tô màu lại), đã chuyển thành đồ 3D theo
-  hệ OUTFITS. Đổi bộ đồ giữa chừng thì người khác cũng thấy nhân vật dựng lại theo bộ mới.
+  **Trắng** (váy trắng + blazer trắng có ve áo/khuy/túi ngực + thắt lưng đen + tất trắng +
+  giày đen + kính râm to + môi đỏ + khuyên tai sao vàng + vòng tay vàng).
+  2 bộ Hắc Ám/Trắng làm lại chi tiết theo đúng pack `14_power_couples.zip` người dùng gửi
+  (người dùng muốn nhân vật đẹp giống như pack — đã ghép thử các lớp PNG của pack để xem
+  đủ bộ: nam denim đen + sơ mi trắng + cargo đen + xích + bốt buộc dây + tattoo; nữ váy trắng
+  + blazer trắng + kính râm + môi đỏ + khuyên sao) — pack gốc là sprite 2D 444×700 (mỗi món
+  1 lớp PNG trong suốt, có cả bản đen trắng để tô màu lại), đã chuyển thành đồ 3D chi tiết
+  theo hệ OUTFITS (thêm các trường mới: shirt/blazer/belt/chain/necklace/bracelet/glasses/
+  lips/earrings/laces). Đổi bộ đồ giữa chừng thì người khác cũng thấy nhân vật dựng lại theo bộ mới.
 - **Chat bong bóng 3D**: bong bóng bám theo đầu nhân vật, kèm log chat.
 - **Tivi YouTube**: màn hình lớn trên tường (luôn bật, không bấm tương tác được). Video chiếu thật lên màn hình tivi 3D trong game (CSS3DRenderer), tự tắt phụ đề và thanh điều khiển. Dán link YouTube để thêm vào hàng chờ chung cả quán — hết video này tự phát video người sau. Âm thanh chỉnh riêng từng người (nút loa trên thanh trên cùng + thanh trượt trong bảng tivi).
 - **Kết bạn**: bấm vào người khác để xem hồ sơ, chào và kết bạn (lưu localStorage).

@@ -51,10 +51,12 @@ const OUTFITS = {
     dark: {
       label: 'Hắc Ám',
       hair: { type: 'spiky' },
-      top: { type: 'denim', main: 0x1f2937, pocket: 0x111827 },
-      bottom: { type: 'cargo', main: 0x111827, pocket: 0x1f2937 },
-      shoes: { type: 'boots', main: 0x111827, sole: 0x000000 },
+      top: { type: 'denim', main: 0x1f2937, pocket: 0x111827, shirt: 0xffffff },
+      bottom: { type: 'cargo', main: 0x111827, pocket: 0x1f2937, belt: 0x111827, chain: true },
+      shoes: { type: 'boots', main: 0x111827, sole: 0x000000, laces: true },
       tattoo: { main: 0x111827 },
+      necklace: { main: 0xd1d5db },
+      bracelet: { main: 0xd1d5db },
     },
   },
   female: {
@@ -93,9 +95,13 @@ const OUTFITS = {
     white: {
       label: 'Trắng',
       hair: { type: 'long' },
-      top: { type: 'dress', main: 0xf5f5f4, belt: 0x111827 },
+      top: { type: 'dress', main: 0xf5f5f4, belt: 0x111827, blazer: 0xffffff },
       bottom: { type: 'dress', main: 0xf5f5f4 },
       shoes: { type: 'maryjane', main: 0x111827 },
+      glasses: { main: 0x111827 },
+      lips: 0xdc2626,
+      earrings: { main: 0xfbbf24 },
+      bracelet: { main: 0xfbbf24 },
     },
   },
 };
@@ -1402,6 +1408,16 @@ const SHARED_GEO = {
   bootShaft: new THREE.CylinderGeometry(0.062, 0.06, 0.2, 10),
   sandalSole: new THREE.BoxGeometry(0.14, 0.03, 0.28),
   sandalStrap: new THREE.BoxGeometry(0.13, 0.015, 0.05),
+  // Chi tiết pack 14_power_couples: ve áo, áo sơ mi trong, mắt xích, mặt dây chuyền,
+  // vòng tay, mắt kính, khuyên tai ngôi sao, dây giày
+  lapel: new THREE.BoxGeometry(0.07, 0.24, 0.015),
+  shirtV: new THREE.BoxGeometry(0.13, 0.36, 0.015),
+  chainLink: new THREE.TorusGeometry(0.022, 0.007, 6, 10),
+  pendant: new THREE.BoxGeometry(0.04, 0.05, 0.015),
+  bracelet: new THREE.TorusGeometry(0.042, 0.008, 6, 16),
+  lens: new THREE.BoxGeometry(0.085, 0.05, 0.02),
+  star: new THREE.OctahedronGeometry(0.025),
+  lace: new THREE.BoxGeometry(0.08, 0.012, 0.01),
 };
 SHARED_GEO.thigh.translate(0, -0.22, 0);
 SHARED_GEO.shin.translate(0, -0.21, 0);
@@ -1578,7 +1594,14 @@ function buildOutfit(spec, outfit, P, M) {
     add(P.rig, new THREE.Mesh(SHARED_GEO.collar, mat(outfit.top.pocket)), 0, 1.42, 0, Math.PI / 2, 0, 0);
     [-0.075, 0.075].forEach((x) =>
       add(P.rig, new THREE.Mesh(SHARED_GEO.chestPocket, mat(outfit.top.pocket)), x, 1.33, 0.155));
-    add(P.rig, new THREE.Mesh(SHARED_GEO.zipper, mat(outfit.top.pocket)), 0, 1.23, 0.16);
+    // Áo khoác mở để lộ áo sơ mi trắng + ve áo (pack char 2: denim đen + sơ mi trắng)
+    if (outfit.top.shirt) {
+      add(P.rig, new THREE.Mesh(SHARED_GEO.shirtV, mat(outfit.top.shirt)), 0, 1.24, 0.155);
+      add(P.rig, new THREE.Mesh(SHARED_GEO.lapel, mat(outfit.top.main)), -0.09, 1.36, 0.16, 0, 0, 0.35);
+      add(P.rig, new THREE.Mesh(SHARED_GEO.lapel, mat(outfit.top.main)), 0.09, 1.36, 0.16, 0, 0, -0.35);
+    } else {
+      add(P.rig, new THREE.Mesh(SHARED_GEO.zipper, mat(outfit.top.pocket)), 0, 1.23, 0.16);
+    }
     [1.38, 1.28, 1.18, 1.08].forEach((y) =>
       add(P.rig, new THREE.Mesh(SHARED_GEO.button, mat(0xd1d5db)), 0.02, y, 0.165));
   } else if (outfit.top?.type === 'sport') {
@@ -1592,11 +1615,31 @@ function buildOutfit(spec, outfit, P, M) {
   } else if (outfit.top?.type === 'dress') {
     add(P.rig, new THREE.Mesh(SHARED_GEO.dressLathe, M.shirt), 0, 1.36, 0);
     add(P.rig, new THREE.Mesh(SHARED_GEO.dressBelt, mat(outfit.top.belt)), 0, 1.18, 0, Math.PI / 2, 0, 0);
+    // Áo blazer trắng khoác ngoài váy (pack char 1): ve áo + khuy + túi ngực
+    if (outfit.top.blazer) {
+      const blazerM = mat(outfit.top.blazer);
+      add(P.rig, new THREE.Mesh(SHARED_GEO.lapel, blazerM), -0.09, 1.36, 0.16, 0, 0, 0.35);
+      add(P.rig, new THREE.Mesh(SHARED_GEO.lapel, blazerM), 0.09, 1.36, 0.16, 0, 0, -0.35);
+      [1.38, 1.26, 1.14].forEach((y) =>
+        add(P.rig, new THREE.Mesh(SHARED_GEO.button, mat(0x111827)), 0, y, 0.165));
+      add(P.rig, new THREE.Mesh(SHARED_GEO.chestPocket, blazerM), -0.1, 1.3, 0.16);
+    }
   }
   /* Quần / váy (hông giờ ở y 0.90) */
   if (outfit.bottom?.type === 'cargo') {
     [P.legL, P.legR].forEach((leg) =>
       add(leg.thigh, new THREE.Mesh(SHARED_GEO.cargoPocket, mat(outfit.bottom.pocket)), 0.02, -0.14, 0.06));
+    // Thắt lưng + khóa + dây xích treo hông (pack char 2: belt + chain)
+    if (outfit.bottom.belt) {
+      add(P.rig, new THREE.Mesh(SHARED_GEO.belt, mat(outfit.bottom.belt)), 0, 0.95, 0, Math.PI / 2, 0, 0);
+      add(P.rig, new THREE.Mesh(SHARED_GEO.buckle, mat(0xd1d5db)), 0, 0.95, 0.17);
+    }
+    if (outfit.bottom.chain) {
+      // Dây xích treo từ thắt lưng xuống đùi phải: 5 mắt xích bạc
+      for (let i = 0; i < 5; i++) {
+        add(P.rig, new THREE.Mesh(SHARED_GEO.chainLink, mat(0xd1d5db)), 0.16, 0.9 - i * 0.045, 0.16, 0, 0, i % 2 ? Math.PI / 2 : 0);
+      }
+    }
   } else if (outfit.bottom?.type === 'skirt') {
     add(P.rig, new THREE.Mesh(SHARED_GEO.skirtLathe, mat(outfit.bottom.main, 0.8)), 0, 0.9, 0);
     add(P.rig, new THREE.Mesh(SHARED_GEO.waistband, mat(outfit.bottom.band)), 0, 0.89, 0, Math.PI / 2, 0, 0);
@@ -1616,6 +1659,30 @@ function buildOutfit(spec, outfit, P, M) {
     add(P.rig, new THREE.Mesh(SHARED_GEO.bagStrap, bagM), 0, 1.2, 0.17, 0, 0, -0.83);
     add(P.rig, new THREE.Mesh(SHARED_GEO.bag, bagM), 0.19, 1.0, 0.08, 0, 0, -0.15);
   }
+  /* Phụ kiện pack 14_power_couples: dây chuyền, vòng tay, kính râm, khuyên tai sao */
+  if (outfit.necklace) {
+    const nM = mat(outfit.necklace.main);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, nM), 0, 1.44, 0, Math.PI / 2, 0, 0, 0.55, 0.55, 0.55);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.pendant, nM), 0, 1.32, 0.17);
+  }
+  if (outfit.bracelet) {
+    const bM = mat(outfit.bracelet.main);
+    [P.armL, P.armR].forEach((arm) =>
+      add(arm.fore, new THREE.Mesh(SHARED_GEO.bracelet, bM), 0, -0.24, 0, Math.PI / 2, 0, 0));
+  }
+  if (outfit.glasses) {
+    const gM = mat(outfit.glasses.main);
+    // Kính râm to che cả mắt (đặt trước cả điểm sáng mắt ở z 0.19)
+    [-0.07, 0.07].forEach((x) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.lens, gM), x, 0.03, 0.21, 0, 0, 0, 1.25, 1.3, 1));
+    add(P.head, new THREE.Mesh(SHARED_GEO.lens, gM), 0, 0.035, 0.21, 0, 0, 0, 0.3, 0.5, 1);
+  }
+  if (outfit.earrings) {
+    const eM = mat(outfit.earrings.main);
+    // Khuyên tai sao treo thấp ra trước để khỏi bị tóc dài che
+    [-0.19, 0.19].forEach((x) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.star, eM), x, -0.12, 0.06));
+  }
   /* Giày (cẳng chân giờ dài 0.42 — giày ở cuối cẳng) */
   [P.legL, P.legR].forEach((leg) => {
     if (outfit.shoes?.type === 'sneakers') {
@@ -1629,6 +1696,11 @@ function buildOutfit(spec, outfit, P, M) {
       add(leg.shin, new THREE.Mesh(SHARED_GEO.bootShaft, mat(outfit.shoes.main, 0.6)), 0, -0.27, 0);
       add(leg.shin, new THREE.Mesh(SHARED_GEO.shoeRound, mat(outfit.shoes.main, 0.5)), 0, -0.38, 0.05);
       add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.sole)), 0, -0.42, 0.05);
+      // Dây giày buộc ngang cổ bốt (pack char 2: lace-up boots)
+      if (outfit.shoes.laces) {
+        [-0.22, -0.26, -0.3].forEach((y) =>
+          add(leg.shin, new THREE.Mesh(SHARED_GEO.lace, mat(0x111827)), 0, y, 0.065));
+      }
     } else if (outfit.shoes?.type === 'sandals') {
       add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.main, 0.6)), 0, -0.42, 0.05);
       add(leg.shin, new THREE.Mesh(SHARED_GEO.sandalStrap, mat(outfit.shoes.main)), 0, -0.37, 0.08);
@@ -1710,8 +1782,8 @@ function buildCharacter(spec) {
     brow.position.set(x, 0.105, 0.165); brow.rotation.z = x < 0 ? 0.1 : -0.1; head.add(brow);
   });
   const nose = new THREE.Mesh(SHARED_GEO.nose, skin); nose.position.set(0, -0.015, 0.185); head.add(nose);
-  // Môi dưới hồng, hơi mọng
-  const lipM = toonMat(0xe87a7a);
+  // Môi dưới hồng, hơi mọng (đỏ đậm nếu bộ đồ yêu cầu — pack char 1: môi đỏ)
+  const lipM = toonMat(outfit.lips ?? 0xe87a7a);
   const lip = new THREE.Mesh(SHARED_GEO.lip, lipM);
   lip.position.set(0, -0.095, 0.172); lip.scale.set(1.1, 0.5, 0.45); head.add(lip);
   const blushM = new THREE.MeshToonMaterial({ color: 0xfda4af, gradientMap: TOON_GRAD, transparent: true, opacity: 0.65 });
@@ -1725,7 +1797,7 @@ function buildCharacter(spec) {
   const smile = new THREE.Mesh(SHARED_GEO.smile, darkM);
   smile.position.set(0, -0.06, 0.175); smile.rotation.set(0.15, 0, Math.PI); head.add(smile);
   // Trang phục + phụ kiện theo bảng OUTFITS
-  buildOutfit(spec, outfit, { rig, head, legL, legR, body }, { skin, shirt, pants, hairMat, hairHi });
+  buildOutfit(spec, outfit, { rig, head, legL, legR, body, armL, armR }, { skin, shirt, pants, hairMat, hairHi });
   // Bóng mềm dưới chân (gradient mờ dần, không viền cứng): hơi bầu dục và
   // lệch nhẹ ngược hướng mặt trời (mặt trời ở (14,22,10) nên bóng đổ về -x,-z)
   const shadowDisc = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.95), new THREE.MeshBasicMaterial({ map: SHADOW_TEX, transparent: true, depthWrite: false }));
