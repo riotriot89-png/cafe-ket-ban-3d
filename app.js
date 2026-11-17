@@ -36,7 +36,7 @@ for (const [key, url] of Object.entries(GLB_FILES)) {
 const CHARACTERS = [
   { name: 'Jake', gender: 'Nam', outfit: 'glb', outfitId: 'default', desc: 'Người sống sót thành phố hoang tàn, áo da nâu, gậy bóng chày.', glb: 'jake' },
   { name: 'Miku', gender: 'Nữ', outfit: 'glb', outfitId: 'default', desc: 'Mèo trắng tai mèo, áo hồng dấu chân mèo, đuôi dài.', glb: 'miku' },
-  { name: 'Aria', gender: 'Nữ', outfit: 'glb', outfitId: 'default', desc: 'Tóc vàng đội vương miện, áo khoác trắng, bốt nâu cao.', glb: 'aria', faceFlip: true },
+  { name: 'Aria', gender: 'Nữ', outfit: 'glb', outfitId: 'default', desc: 'Tóc vàng đội vương miện, áo khoác trắng, bốt nâu cao.', glb: 'aria' },
 ];
 
 /* ---- Hệ thống trang phục (dữ liệu, không phải code cứng) ----
@@ -1773,11 +1773,10 @@ function buildOutfit(spec, outfit, P, M) {
 function buildGLBCharacter(spec) {
   const group = new THREE.Group();
   const model = SkeletonUtils.clone(glbData[spec.glb].scene);
-  // Aria: model gốc quay mặt về -Z (ngược Jake/Miku) — đã kiểm chứng bằng
-  // ảnh ngang tầm mắt: ngồi ghế quay lưng về tivi. Xoay model 180° để mặt
-  // hướng +Z như 2 nhân vật kia (xương/animation theo model nên không ảnh
-  // hưởng ngồi/uống/đi).
-  if (spec.faceFlip) model.rotation.y = Math.PI;
+  // Cả 3 model GLB đều quay mặt về +Z như nhau (Jake/Miku/Aria) — đã kiểm
+  // chứng bằng ảnh ngang tầm mắt bắc/nam: ở rotY PI, camera bắc thấy mặt,
+  // camera nam thấy lưng. KHÔNG xoay model 180°: bản flip trước đây
+  // (faceFlip) chính là lỗi làm Aria đi giật lùi + ngồi quay lưng về tivi.
   group.add(model);
   // Tìm xương cần dùng (tên xương Jake và Miku giống hệt nhau)
   const bones = {};
