@@ -21,13 +21,18 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   canvas static); (2) lỗ màn hình phải có `renderOrder = -1` để được vẽ trước tường
   (opaque sort theo material trước rồi mới theo độ sâu, nên tường vẽ trước sẽ làm
   lỗ không xóa được màu tường).
-- **Nhân vật 3D chibi thời trang, cao ~1,7**: chỉ 2 nhân vật — **Milo (nam)**: bộ Street
+- **Nhân vật 3D phong cách anime Genshin, cao ~1,85**: chỉ 2 nhân vật — **Milo (nam)**: bộ Street
   (snapback đen vành đỏ có logo, hoodie kem túi kangaroo đỏ, quần cargo rêu có túi hộp,
   giày sneaker trắng đế đỏ); **Luna (nữ)**: bộ Chic (mũ beret hồng, nơ hồng, tóc dài mái ngang,
-  áo trắng cổ bèo, váy xòe hồng có thắt lưng, túi xách chéo vàng, tất trắng dài, giày búp bê).
-  Mặt có hồn: mắt to (tròng trắng + mống mắt màu + con ngươi + điểm sáng + mi trên),
-  lông mày, mũi nhỏ, má hồng mờ, miệng cười; thân thon có eo (lathe), bàn tay tròn,
-  giày bo tròn, váy xòe/váy liền tiện bằng lathe — không còn là khối hộp vuông.
+  áo trắng cổ bèo, váy xòe hồng 2 lớp có thắt lưng, túi xách chéo vàng, tất trắng dài, giày búp bê).
+  **Cel-shading kiểu Genshin**: da/áo/tóc dùng MeshToonMaterial + gradient map 3 bậc (sáng / nửa tối /
+  tối rõ rệt thay vì chuyển mượt), viền đậm quanh đầu (inverted hull). Tỉ lệ anime: đầu nhỏ
+  (r 0,19), người cao thon ~1,85, chân tay dài. Mặt anime: mắt to lấp lánh (mống mắt vẽ gradient
+  có tia hướng tâm + 2 điểm sáng + mi trên dày + mi dưới mảnh), lông mày mảnh, mũi nhỏ, môi hồng,
+  má hồng, miệng cười; thân thon có eo (lathe), bàn tay thon có ngón cái, giày bo tròn, váy xòe/
+  váy liền tiện bằng lathe — không còn là khối hộp vuông. Tóc Genshin nhiều lớp: lọn tóc hình
+  giọt nước xếp lớp + lọn highlight sáng hơn, tóc dài có 2 lọn 2 bên, tóc xoăn/búi/đuôi ngựa
+  đều có lọn highlight. Váy 2 lớp (lớp ngoài xòe hơn, mép dưới lộ ra tạo lớp kép ở gấu váy).
   Đi bộ, ngồi xuống ghế, nâng ly uống cà phê, thở, chớp mắt, quay đầu. Bóng dưới chân
   là bóng mềm (gradient mờ dần, hơi bầu dục, lệch ngược hướng mặt trời) chứ không
   phải đĩa đen cứng.
@@ -48,9 +53,9 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   thật (PCFSoft, bias/normalBias/radius đã chỉnh) + bóng mềm dưới chân nhân vật +
   bóng tiếp xúc dưới mỗi bàn. **Quán hoàn thiện**: trần gỗ + dầm, cửa sổ 2 bên có bầu
   trời thành phố + rèm vải, tranh treo tường + đồng hồ, chân tường, sân vườn có luống
-  hoa + hàng rào cây, bàn nào cũng có đĩa + bình hoa mini. **Nhân vật**: da có độ bóng
-  nhẹ (clearcoat), cổ, môi hồng, tay có ngón cái, tóc nhiều lớp có độ phồng + lọn mái,
-  quần áo có dây rút/khuy/khóa kéo/gấu áo. **Không khí**: chùm sáng ấm dưới đèn treo,
+  hoa + hàng rào cây, bàn nào cũng có đĩa + bình hoa mini. **Nhân vật (làm lại kiểu
+  Genshin 2026-11-17)**: cel-shading 3 bậc + viền đậm, tỉ lệ anime cao thon, mắt
+  gradient có tia hướng tâm, tóc nhiều lớp có highlight, váy 2 lớp. **Không khí**: chùm sáng ấm dưới đèn treo,
   bụi bay lơ lửng, viền tối điện ảnh (vignette). Trần tự ẩn khi camera ở trên cao
   (góc toàn cảnh) để khỏi che tầm nhìn.
 - **Tủ đồ (8 bộ)**: mỗi nhân vật có 4 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy

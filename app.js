@@ -387,6 +387,56 @@ function photoTex(uri, rx = 1, ry = 1) {
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
+// Cel-shading kiểu Genshin: ánh sáng chia thành 3 vùng rõ rệt (sáng / nửa tối /
+// tối) thay vì chuyển mượt như thật. MeshToonMaterial + gradient map 3 bậc.
+const TOON_GRAD = (() => {
+  const data = new Uint8Array([90, 165, 255]);
+  const tex = new THREE.DataTexture(data, 3, 1, THREE.RedFormat);
+  tex.minFilter = THREE.NearestFilter; tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
+})();
+function toonMat(color, opts = {}) {
+  return new THREE.MeshToonMaterial({ color, gradientMap: TOON_GRAD, ...opts });
+}
+// Viền đậm kiểu anime (inverted hull): 1 bản sao đen, vẽ mặt sau, phóng to nhẹ
+const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x1a1a2e, side: THREE.BackSide });
+function addOutline(parent, geo, scale = 1.045) {
+  const o = new THREE.Mesh(geo, OUTLINE_MAT);
+  o.scale.setScalar(scale);
+  parent.add(o);
+  return o;
+}
+// Mống mắt anime: texture vẽ tay — vòng ngoài đậm, giữa sáng, có tia hướng tâm
+function irisTexture(colorHex) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const col = '#' + colorHex.toString(16).padStart(6, '0');
+  // Nền tối
+  g.fillStyle = '#1a1210'; g.fillRect(0, 0, 128, 128);
+  // Vòng màu chính
+  const grad = g.createRadialGradient(64, 64, 8, 64, 64, 62);
+  grad.addColorStop(0, '#241a12');
+  grad.addColorStop(0.35, col);
+  grad.addColorStop(0.8, col);
+  grad.addColorStop(1, '#0d0a08');
+  g.fillStyle = grad; g.beginPath(); g.arc(64, 64, 62, 0, Math.PI * 2); g.fill();
+  // Tia hướng tâm (tạo chiều sâu cho mắt anime)
+  g.strokeStyle = 'rgba(255,255,255,0.22)'; g.lineWidth = 3;
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    g.beginPath();
+    g.moveTo(64 + Math.cos(a) * 18, 64 + Math.sin(a) * 18);
+    g.lineTo(64 + Math.cos(a) * 56, 64 + Math.sin(a) * 56);
+    g.stroke();
+  }
+  // Vòng sáng trên (ánh sáng hắt vào mắt)
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  g.beginPath(); g.ellipse(64, 30, 34, 14, 0, 0, Math.PI * 2); g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 const MAT = {
   wood: new THREE.MeshStandardMaterial({ map: tableWoodTexture(), roughness: 0.55 }),
   woodDark: new THREE.MeshStandardMaterial({ color: 0x4a2c14, roughness: 0.6 }),
@@ -1276,15 +1326,15 @@ stringLights(9.5, 5.2); stringLights(13.5, 5.2);
 /* ============ NHÂN VẬT 3D (LOW-POLY, CÓ KHỚP TAY CHÂN) ============ */
 const SHARED_GEO = {
   body: new THREE.CapsuleGeometry(0.19, 0.34, 4, 14),
-  head: new THREE.SphereGeometry(0.26, 24, 18),
+  head: new THREE.SphereGeometry(0.19, 24, 18), // đầu nhỏ lại kiểu anime (trước 0.26 chibi)
   eye: new THREE.SphereGeometry(0.04, 10, 8),
-  blush: new THREE.SphereGeometry(0.048, 10, 8),
-  ear: new THREE.SphereGeometry(0.055, 10, 8),
-  smile: new THREE.TorusGeometry(0.048, 0.012, 8, 16, Math.PI),
-  thigh: new THREE.CylinderGeometry(0.075, 0.06, 0.38, 10),
-  shin: new THREE.CylinderGeometry(0.06, 0.05, 0.36, 10),
-  upperArm: new THREE.CylinderGeometry(0.055, 0.045, 0.26, 10),
-  foreArm: new THREE.CylinderGeometry(0.045, 0.04, 0.24, 10),
+  blush: new THREE.SphereGeometry(0.04, 10, 8),
+  ear: new THREE.SphereGeometry(0.045, 10, 8),
+  smile: new THREE.TorusGeometry(0.035, 0.01, 8, 16, Math.PI),
+  thigh: new THREE.CylinderGeometry(0.065, 0.052, 0.44, 10), // chân dài hơn
+  shin: new THREE.CylinderGeometry(0.052, 0.042, 0.42, 10),
+  upperArm: new THREE.CylinderGeometry(0.045, 0.038, 0.30, 10), // tay dài hơn
+  foreArm: new THREE.CylinderGeometry(0.038, 0.033, 0.28, 10),
   cup: new THREE.CylinderGeometry(0.045, 0.038, 0.09, 12),
   coffeeTop: new THREE.CylinderGeometry(0.04, 0.04, 0.01, 12),
   hairCone: new THREE.ConeGeometry(0.07, 0.2, 8),
@@ -1338,17 +1388,17 @@ const SHARED_GEO = {
   sandalSole: new THREE.BoxGeometry(0.14, 0.03, 0.28),
   sandalStrap: new THREE.BoxGeometry(0.13, 0.015, 0.05),
 };
-SHARED_GEO.thigh.translate(0, -0.19, 0);
-SHARED_GEO.shin.translate(0, -0.18, 0);
-SHARED_GEO.upperArm.translate(0, -0.13, 0);
-// Thân thon có eo (lathe): hông - eo - ngực - vai, thay cho capsule thẳng đuột
+SHARED_GEO.thigh.translate(0, -0.22, 0);
+SHARED_GEO.shin.translate(0, -0.21, 0);
+SHARED_GEO.upperArm.translate(0, -0.15, 0);
+// Thân anime thon dài có eo (lathe): hông - eo - ngực - vai, cao 0.56
 SHARED_GEO.torso = new THREE.LatheGeometry([
-  new THREE.Vector2(0.0, -0.22), new THREE.Vector2(0.15, -0.22), new THREE.Vector2(0.18, -0.12),
-  new THREE.Vector2(0.155, 0.0), new THREE.Vector2(0.18, 0.1), new THREE.Vector2(0.165, 0.18),
-  new THREE.Vector2(0.1, 0.22), new THREE.Vector2(0.0, 0.22),
+  new THREE.Vector2(0.0, -0.28), new THREE.Vector2(0.13, -0.28), new THREE.Vector2(0.155, -0.18),
+  new THREE.Vector2(0.135, 0.0), new THREE.Vector2(0.155, 0.12), new THREE.Vector2(0.14, 0.2),
+  new THREE.Vector2(0.085, 0.28), new THREE.Vector2(0.0, 0.28),
 ], 20);
-// Bàn tay tròn
-SHARED_GEO.hand = new THREE.SphereGeometry(0.055, 12, 10);
+// Bàn tay nhỏ hơn, thon hơn
+SHARED_GEO.hand = new THREE.SphereGeometry(0.045, 12, 10);
 // Giày bo tròn (không còn hộp vuông): thân giày + đế
 SHARED_GEO.shoeRound = new THREE.SphereGeometry(0.09, 16, 12);
 SHARED_GEO.shoeRound.scale(1, 0.62, 1.7);
@@ -1366,21 +1416,27 @@ SHARED_GEO.dressLathe = new THREE.LatheGeometry([
   new THREE.Vector2(0.24, -0.3), new THREE.Vector2(0.33, -0.55), new THREE.Vector2(0.42, -0.68),
   new THREE.Vector2(0.43, -0.7), new THREE.Vector2(0.41, -0.71),
 ], 24);
-// Mắt có hồn: tròng trắng, mống mắt, con ngươi, điểm sáng, mi trên, lông mày, mũi
-SHARED_GEO.eyeWhite = new THREE.SphereGeometry(0.055, 14, 10);
+// Mắt anime: to và cao hơn, mống mắt gradient, mi trên dày, lông mày mảnh
+SHARED_GEO.eyeWhite = new THREE.SphereGeometry(0.05, 14, 10);
 SHARED_GEO.iris = new THREE.SphereGeometry(0.032, 12, 10);
-SHARED_GEO.pupil = new THREE.SphereGeometry(0.016, 10, 8);
-SHARED_GEO.glint = new THREE.SphereGeometry(0.012, 8, 6);
-SHARED_GEO.lash = new THREE.TorusGeometry(0.055, 0.012, 8, 16, Math.PI * 0.7);
-SHARED_GEO.brow = new THREE.BoxGeometry(0.09, 0.016, 0.02);
-SHARED_GEO.nose = new THREE.SphereGeometry(0.018, 8, 6);
-// Cổ, ngón cái, môi dưới
-SHARED_GEO.neck = new THREE.CylinderGeometry(0.085, 0.095, 0.2, 12);
-SHARED_GEO.thumb = new THREE.SphereGeometry(0.022, 8, 6);
-SHARED_GEO.lip = new THREE.SphereGeometry(0.035, 12, 8);
-// Tóc: lớp phồng sau đầu + lọn mái
-SHARED_GEO.hairBackVol = new THREE.SphereGeometry(0.27, 20, 14);
-SHARED_GEO.bangLock = new THREE.CylinderGeometry(0.035, 0.02, 0.14, 8);
+SHARED_GEO.pupil = new THREE.SphereGeometry(0.015, 10, 8);
+SHARED_GEO.glint = new THREE.SphereGeometry(0.011, 8, 6);
+SHARED_GEO.glint2 = new THREE.SphereGeometry(0.006, 8, 6);
+SHARED_GEO.lash = new THREE.TorusGeometry(0.05, 0.013, 8, 16, Math.PI * 0.75);
+SHARED_GEO.lashLower = new THREE.TorusGeometry(0.048, 0.006, 8, 16, Math.PI * 0.5);
+SHARED_GEO.brow = new THREE.BoxGeometry(0.075, 0.012, 0.015);
+SHARED_GEO.nose = new THREE.SphereGeometry(0.014, 8, 6);
+// Cổ mảnh hơn, ngón cái, môi dưới
+SHARED_GEO.neck = new THREE.CylinderGeometry(0.06, 0.07, 0.16, 12);
+SHARED_GEO.thumb = new THREE.SphereGeometry(0.018, 8, 6);
+SHARED_GEO.lip = new THREE.SphereGeometry(0.028, 12, 8);
+// Tóc Genshin: lọn tóc hình giọt nước (nhọn ở ngọn, phồng ở gốc) để xếp lớp
+SHARED_GEO.hairLock = new THREE.LatheGeometry([
+  new THREE.Vector2(0.0, 0.0), new THREE.Vector2(0.05, 0.03), new THREE.Vector2(0.065, 0.12),
+  new THREE.Vector2(0.055, 0.22), new THREE.Vector2(0.028, 0.3), new THREE.Vector2(0.0, 0.33),
+], 12);
+SHARED_GEO.hairBackVol = new THREE.SphereGeometry(0.2, 20, 14);
+SHARED_GEO.bangLock = new THREE.CylinderGeometry(0.03, 0.016, 0.12, 8);
 // Chi tiết quần áo: dây rút, khuy, gấu áo, sọc hông
 SHARED_GEO.drawstring = new THREE.CylinderGeometry(0.012, 0.012, 0.12, 6);
 SHARED_GEO.button = new THREE.SphereGeometry(0.018, 8, 6);
@@ -1401,7 +1457,7 @@ function makeShadowTexture() {
   return new THREE.CanvasTexture(cv);
 }
 const SHADOW_TEX = makeShadowTexture();
-SHARED_GEO.foreArm.translate(0, -0.12, 0);
+SHARED_GEO.foreArm.translate(0, -0.14, 0);
 
 /* ---- Trang phục + phụ kiện: mỗi loại món đồ là 1 hàm dựng riêng,
    buildOutfit chỉ việc tra bảng OUTFITS rồi gọi đúng hàm theo type ---- */
@@ -1410,222 +1466,246 @@ function buildOutfit(spec, outfit, P, M) {
     mesh.position.set(x, y, z); mesh.rotation.set(rx, ry, rz); mesh.scale.set(sx, sy, sz);
     mesh.castShadow = true; parent.add(mesh); return mesh;
   };
-  const mat = (c, r = 0.7) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
-  const white = mat(0xffffff, 0.6);
-  /* Tóc: nhiều lớp, có độ phồng sau đầu + lọn tóc, không còn như mũ bảo hiểm */
+  const mat = (c, r = 0.7) => toonMat(c);
+  const white = toonMat(0xffffff);
+  /* Tóc Genshin: nhiều lớp, lọn tóc hình giọt nước, highlight sáng ở lớp trên */
   // Lớp tóc sau đầu (độ phồng) cho các kiểu tóc ngắn
   if (['short', 'spiky', 'curly', 'bob'].includes(outfit.hair?.type)) {
-    add(P.head, new THREE.Mesh(SHARED_GEO.hairBackVol, M.hairMat), 0, 0.04, -0.07, 0, 0, 0, 1, 0.95, 0.9);
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairBackVol, M.hairMat), 0, 0.03, -0.05, 0, 0, 0, 1, 0.95, 0.9);
   }
   if (outfit.hair?.type === 'spiky') {
-    [[-0.23, 0.0, -0.12], [0.23, 0.0, -0.12], [0, -0.02, -0.24], [-0.12, 0.1, 0.05], [0.12, 0.1, 0.05], [0, 0.14, -0.08]].forEach(([x, y, z]) =>
-      add(P.head, new THREE.Mesh(SHARED_GEO.hairCone, M.hairMat), x, y, z, x * 1.2, 0, x * -1.2));
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.07, -0.01, 0, 0, 0, 1, 0.55, 1);
+    // Gai nhọn tỏa ra quanh đỉnh đầu
+    [[-0.16, 0.02, -0.08, 0.9], [0.16, 0.02, -0.08, -0.9], [0, 0.0, -0.17, 0], [-0.1, 0.12, 0.02, 0.5], [0.1, 0.12, 0.02, -0.5], [0, 0.14, -0.05, 0]].forEach(([x, y, z, rz]) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.hairCone, M.hairMat), x, y, z, 0, 0, rz));
+    // Lọn highlight trên đỉnh
+    [[-0.06, 0.14, 0.03, 0.4], [0.06, 0.14, 0.03, -0.4]].forEach(([x, y, z, rz]) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.hairCone, M.hairHi), x, y, z, 0, 0, rz));
     // Mái ngang vài lọn
-    [-0.12, 0, 0.12].forEach((x) =>
-      add(P.head, new THREE.Mesh(SHARED_GEO.bangLock, M.hairMat), x, 0.12, 0.2, 0.25, 0, 0));
+    [-0.09, 0, 0.09].forEach((x) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.bangLock, M.hairMat), x, 0.09, 0.15, 0.25, 0, 0));
   } else if (outfit.hair?.type === 'short') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.1, -0.02, 0, 0, 0, 1, 0.5, 1);
-    [-0.14, -0.05, 0.05, 0.14].forEach((x) =>
-      add(P.head, new THREE.Mesh(SHARED_GEO.bangLock, M.hairMat), x, 0.1, 0.21, 0.3, 0, 0));
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.07, -0.01, 0, 0, 0, 1, 0.5, 1);
+    [-0.1, -0.035, 0.035, 0.1].forEach((x) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.bangLock, M.hairMat), x, 0.07, 0.15, 0.3, 0, 0));
+    // Lọn highlight mái
+    add(P.head, new THREE.Mesh(SHARED_GEO.bangLock, M.hairHi), 0, 0.1, 0.15, 0.25, 0, 0);
   } else if (outfit.hair?.type === 'curly') {
-    [[0, 0.2, 0], [-0.13, 0.14, 0.06], [0.13, 0.14, 0.06], [-0.07, 0.16, -0.12], [0.08, 0.15, -0.12], [-0.2, 0.05, -0.05], [0.2, 0.05, -0.05], [0, 0.1, -0.2]].forEach(([x, y, z]) =>
+    [[0, 0.15, 0], [-0.1, 0.1, 0.04], [0.1, 0.1, 0.04], [-0.05, 0.12, -0.09], [0.06, 0.11, -0.09], [-0.15, 0.03, -0.03], [0.15, 0.03, -0.03], [0, 0.07, -0.15]].forEach(([x, y, z]) =>
       add(P.head, new THREE.Mesh(SHARED_GEO.curl, M.hairMat), x, y, z));
+    // Lọn xoăn highlight trên đỉnh
+    [[-0.05, 0.17, 0.02], [0.06, 0.16, 0.02]].forEach(([x, y, z]) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.curl, M.hairHi), x, y, z));
   } else if (outfit.hair?.type === 'bob') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.08, -0.02, 0, 0, 0, 1, 0.7, 1);
-    [-0.2, 0.2].forEach((x) =>
-      add(P.head, new THREE.Mesh(SHARED_GEO.bobSide, M.hairMat), x, -0.08, 0.05));
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.06, -0.01, 0, 0, 0, 1, 0.7, 1);
+    [-0.15, 0.15].forEach((x) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.bobSide, M.hairMat), x, -0.06, 0.03));
+    // Lọn highlight 2 bên
+    [-0.13, 0.13].forEach((x) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.bobSide, M.hairHi), x, 0.02, 0.08, 0, 0, 0, 0.8, 0.8, 0.8));
   } else if (outfit.hair?.type === 'ponytail') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.1, -0.02, 0, 0, 0, 1, 0.6, 1);
-    add(P.head, new THREE.Mesh(SHARED_GEO.tail, M.hairMat), 0, -0.15, -0.28, 0.5, 0, 0);
-    add(P.head, new THREE.Mesh(SHARED_GEO.tailTie, mat(0xec4899)), 0, 0.05, -0.27);
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.07, -0.01, 0, 0, 0, 1, 0.6, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.tail, M.hairMat), 0, -0.1, -0.2, 0.5, 0, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.tailTie, mat(0xec4899)), 0, 0.04, -0.19);
+    // Lọn tóc đuôi ngựa highlight
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairLock, M.hairHi), 0.05, -0.05, -0.22, 0.6, 0, 0, 0.8, 0.8, 0.8);
   } else if (outfit.hair?.type === 'bun') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.1, -0.02, 0, 0, 0, 1, 0.6, 1);
-    add(P.head, new THREE.Mesh(SHARED_GEO.bun, M.hairMat), 0, 0.28, -0.05);
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.07, -0.01, 0, 0, 0, 1, 0.6, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.bun, M.hairMat), 0, 0.2, -0.03);
+    add(P.head, new THREE.Mesh(SHARED_GEO.bun, M.hairHi), 0, 0.24, 0.02, 0, 0, 0, 0.6, 0.6, 0.6);
   } else if (outfit.hair?.type === 'long') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.bang, M.hairMat), 0, 0.12, -0.03, 0, 0, 0, 1, 0.5, 1);
-    add(P.head, new THREE.Mesh(SHARED_GEO.hairBack, M.hairMat), 0, -0.24, -0.2, 0, 0, 0, 1, 1, 0.5);
-    [-0.24, 0.24].forEach((x) =>
-      add(P.head, new THREE.Mesh(SHARED_GEO.hairLock, M.hairMat), x, -0.16, 0.08));
+    add(P.head, new THREE.Mesh(SHARED_GEO.bang, M.hairMat), 0, 0.09, -0.02, 0, 0, 0, 1, 0.5, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairBack, M.hairMat), 0, -0.18, -0.15, 0, 0, 0, 1, 1, 0.5);
+    // 2 lọn tóc dài 2 bên (hình giọt nước) + highlight
+    [-0.18, 0.18].forEach((x) => {
+      add(P.head, new THREE.Mesh(SHARED_GEO.hairLock, M.hairMat), x, -0.1, 0.06, 0.15, 0, x > 0 ? -0.15 : 0.15);
+      add(P.head, new THREE.Mesh(SHARED_GEO.hairLock, M.hairHi), x * 0.85, -0.05, 0.1, 0.1, 0, x > 0 ? -0.2 : 0.2, 0.7, 0.7, 0.7);
+    });
     if (outfit.hair.bow) {
       const bowM = mat(outfit.hair.bow);
-      add(P.head, new THREE.Mesh(SHARED_GEO.bowWing, bowM), 0.1, 0.18, 0.11, 0, 0, 0.5);
-      add(P.head, new THREE.Mesh(SHARED_GEO.bowWing, bowM), 0.24, 0.18, 0.09, 0, 0, -0.5);
-      add(P.head, new THREE.Mesh(SHARED_GEO.bowKnot, bowM), 0.17, 0.18, 0.11);
+      add(P.head, new THREE.Mesh(SHARED_GEO.bowWing, bowM), 0.08, 0.14, 0.08, 0, 0, 0.5);
+      add(P.head, new THREE.Mesh(SHARED_GEO.bowWing, bowM), 0.18, 0.14, 0.06, 0, 0, -0.5);
+      add(P.head, new THREE.Mesh(SHARED_GEO.bowKnot, bowM), 0.13, 0.14, 0.08);
     }
   }
-  /* Nón */
+  /* Nón (tỉ lệ theo đầu nhỏ r 0.19) */
   if (outfit.hat?.type === 'snapback') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.capTop, mat(outfit.hat.main)), 0, 0.1, -0.01, 0, 0, 0, 1, 0.55, 1);
-    add(P.head, new THREE.Mesh(SHARED_GEO.capBrim, mat(outfit.hat.brim)), 0, 0.08, 0.27, 0.1, 0, 0);
-    add(P.head, new THREE.Mesh(SHARED_GEO.capBtn, mat(outfit.hat.main)), 0, 0.25, 0);
-    add(P.head, new THREE.Mesh(SHARED_GEO.capLogo, mat(outfit.hat.logo)), 0, 0.14, 0.25);
+    add(P.head, new THREE.Mesh(SHARED_GEO.capTop, mat(outfit.hat.main)), 0, 0.07, -0.01, 0, 0, 0, 1, 0.55, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.capBrim, mat(outfit.hat.brim)), 0, 0.06, 0.2, 0.1, 0, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.capBtn, mat(outfit.hat.main)), 0, 0.18, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.capLogo, mat(outfit.hat.logo)), 0, 0.1, 0.18);
   } else if (outfit.hat?.type === 'beret') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.beret, mat(outfit.hat.main)), 0.08, 0.2, 0, 0, 0, -0.25, 1, 0.35, 1);
-    add(P.head, new THREE.Mesh(SHARED_GEO.beretStem, mat(outfit.hat.main)), 0.14, 0.3, 0, 0, 0, -0.25);
+    add(P.head, new THREE.Mesh(SHARED_GEO.beret, mat(outfit.hat.main)), 0.06, 0.15, 0, 0, 0, -0.25, 1, 0.35, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.beretStem, mat(outfit.hat.main)), 0.1, 0.22, 0, 0, 0, -0.25);
   } else if (outfit.hat?.type === 'beanie') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.beanieDome, mat(outfit.hat.main)), 0, 0.12, 0, 0, 0, 0, 1, 0.6, 1);
-    add(P.head, new THREE.Mesh(SHARED_GEO.beanieBrim, mat(outfit.hat.main)), 0, 0.08, 0);
-    add(P.head, new THREE.Mesh(SHARED_GEO.pom, mat(outfit.hat.pom)), 0, 0.3, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.beanieDome, mat(outfit.hat.main)), 0, 0.09, 0, 0, 0, 0, 1, 0.6, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.beanieBrim, mat(outfit.hat.main)), 0, 0.06, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.pom, mat(outfit.hat.pom)), 0, 0.22, 0);
   } else if (outfit.hat?.type === 'sunhat') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.sunBrim, mat(outfit.hat.main)), 0, 0.14, 0);
-    add(P.head, new THREE.Mesh(SHARED_GEO.sunDome, mat(outfit.hat.main)), 0, 0.14, 0, 0, 0, 0, 1, 0.7, 1);
-    add(P.head, new THREE.Mesh(SHARED_GEO.sunBand, mat(outfit.hat.band)), 0, 0.16, 0, Math.PI / 2, 0, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.sunBrim, mat(outfit.hat.main)), 0, 0.1, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.sunDome, mat(outfit.hat.main)), 0, 0.1, 0, 0, 0, 0, 1, 0.7, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.sunBand, mat(outfit.hat.band)), 0, 0.12, 0, Math.PI / 2, 0, 0);
   } else if (outfit.hat?.type === 'headband') {
-    add(P.head, new THREE.Mesh(SHARED_GEO.headband, mat(outfit.hat.main)), 0, 0.1, 0, 0.25, 0, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.headband, mat(outfit.hat.main)), 0, 0.07, 0, 0.25, 0, 0);
   }
-  /* Áo: thêm chi tiết thật — dây rút, khuy, khóa kéo, cổ áo, gấu áo */
+  /* Áo (thân giờ ở y 1.18, vai 1.46 — dời chi tiết lên ~0.18) */
   if (outfit.top?.type === 'hoodie') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.hood, M.shirt), 0, 1.28, -0.15, 0, 0, 0, 1, 0.6, 0.7);
-    add(P.rig, new THREE.Mesh(SHARED_GEO.pocket, mat(outfit.top.pocket)), 0, 0.88, 0.18);
-    // Dây rút mũ 2 sợi + viền gấu áo
-    [-0.06, 0.06].forEach((x) =>
-      add(P.rig, new THREE.Mesh(SHARED_GEO.drawstring, mat(outfit.top.pocket)), x, 1.2, 0.19, 0.12, 0, 0));
-    add(P.rig, new THREE.Mesh(SHARED_GEO.hemBand, mat(outfit.top.pocket)), 0, 0.82, 0, Math.PI / 2, 0, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.hood, M.shirt), 0, 1.46, -0.12, 0, 0, 0, 1, 0.6, 0.7);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.pocket, mat(outfit.top.pocket)), 0, 1.06, 0.15);
+    [-0.05, 0.05].forEach((x) =>
+      add(P.rig, new THREE.Mesh(SHARED_GEO.drawstring, mat(outfit.top.pocket)), x, 1.38, 0.16, 0.12, 0, 0));
+    add(P.rig, new THREE.Mesh(SHARED_GEO.hemBand, mat(outfit.top.pocket)), 0, 1.0, 0, Math.PI / 2, 0, 0);
   } else if (outfit.top?.type === 'blouse') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, white), 0, 1.24, 0, Math.PI / 2, 0, 0);
-    // Hàng khuy trắng dọc thân
-    [1.18, 1.08, 0.98, 0.88].forEach((y) =>
-      add(P.rig, new THREE.Mesh(SHARED_GEO.button, white), 0, y, 0.19));
+    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, white), 0, 1.42, 0, Math.PI / 2, 0, 0);
+    [1.36, 1.26, 1.16, 1.06].forEach((y) =>
+      add(P.rig, new THREE.Mesh(SHARED_GEO.button, white), 0, y, 0.16));
   } else if (outfit.top?.type === 'denim') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, mat(outfit.top.pocket)), 0, 1.24, 0, Math.PI / 2, 0, 0);
-    [-0.09, 0.09].forEach((x) =>
-      add(P.rig, new THREE.Mesh(SHARED_GEO.chestPocket, mat(outfit.top.pocket)), x, 1.15, 0.185));
-    add(P.rig, new THREE.Mesh(SHARED_GEO.zipper, mat(outfit.top.pocket)), 0, 1.05, 0.19);
-    // Khuy kim loại dọc khóa
-    [1.2, 1.1, 1.0, 0.9].forEach((y) =>
-      add(P.rig, new THREE.Mesh(SHARED_GEO.button, mat(0xd1d5db)), 0.02, y, 0.195));
+    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, mat(outfit.top.pocket)), 0, 1.42, 0, Math.PI / 2, 0, 0);
+    [-0.075, 0.075].forEach((x) =>
+      add(P.rig, new THREE.Mesh(SHARED_GEO.chestPocket, mat(outfit.top.pocket)), x, 1.33, 0.155));
+    add(P.rig, new THREE.Mesh(SHARED_GEO.zipper, mat(outfit.top.pocket)), 0, 1.23, 0.16);
+    [1.38, 1.28, 1.18, 1.08].forEach((y) =>
+      add(P.rig, new THREE.Mesh(SHARED_GEO.button, mat(0xd1d5db)), 0.02, y, 0.165));
   } else if (outfit.top?.type === 'sport') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.stripe, mat(outfit.top.stripe)), 0, 1.15, 0.185);
-    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, white), 0, 1.24, 0, Math.PI / 2, 0, 0);
-    // Sọc dọc 2 bên hông áo
-    [-0.17, 0.17].forEach((x) =>
-      add(P.rig, new THREE.Mesh(SHARED_GEO.sideStripe, mat(outfit.top.stripe)), x, 1.05, 0.02, 0, 0, 0));
+    add(P.rig, new THREE.Mesh(SHARED_GEO.stripe, mat(outfit.top.stripe)), 0, 1.33, 0.155);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, white), 0, 1.42, 0, Math.PI / 2, 0, 0);
+    [-0.14, 0.14].forEach((x) =>
+      add(P.rig, new THREE.Mesh(SHARED_GEO.sideStripe, mat(outfit.top.stripe)), x, 1.23, 0.02, 0, 0, 0));
   } else if (outfit.top?.type === 'sweater') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.turtle, M.shirt), 0, 1.34, 0);
-    // Gấu len bo + cổ tay bo
-    add(P.rig, new THREE.Mesh(SHARED_GEO.hemBand, M.shirt), 0, 0.82, 0, Math.PI / 2, 0, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.turtle, M.shirt), 0, 1.52, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.hemBand, M.shirt), 0, 1.0, 0, Math.PI / 2, 0, 0);
   } else if (outfit.top?.type === 'dress') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.dressLathe, M.shirt), 0, 1.18, 0);
-    add(P.rig, new THREE.Mesh(SHARED_GEO.dressBelt, mat(outfit.top.belt)), 0, 1.0, 0, Math.PI / 2, 0, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.dressLathe, M.shirt), 0, 1.36, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.dressBelt, mat(outfit.top.belt)), 0, 1.18, 0, Math.PI / 2, 0, 0);
   }
-  /* Quần / váy */
+  /* Quần / váy (hông giờ ở y 0.90) */
   if (outfit.bottom?.type === 'cargo') {
     [P.legL, P.legR].forEach((leg) =>
-      add(leg.thigh, new THREE.Mesh(SHARED_GEO.cargoPocket, mat(outfit.bottom.pocket)), 0.02, -0.12, 0.07));
+      add(leg.thigh, new THREE.Mesh(SHARED_GEO.cargoPocket, mat(outfit.bottom.pocket)), 0.02, -0.14, 0.06));
   } else if (outfit.bottom?.type === 'skirt') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.skirtLathe, mat(outfit.bottom.main, 0.8)), 0, 0.8, 0);
-    add(P.rig, new THREE.Mesh(SHARED_GEO.waistband, mat(outfit.bottom.band)), 0, 0.79, 0, Math.PI / 2, 0, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.skirtLathe, mat(outfit.bottom.main, 0.8)), 0, 0.9, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.waistband, mat(outfit.bottom.band)), 0, 0.89, 0, Math.PI / 2, 0, 0);
+    // Lớp váy ngoài xòe hơn (kiểu Genshin 2 lớp): đặt thấp xuống để mép trên
+    // giấu trong váy chính, chỉ mép dưới xòe ra ngoài tạo lớp kép ở gấu váy
+    add(P.rig, new THREE.Mesh(SHARED_GEO.skirtLathe, mat(outfit.bottom.band, 0.8)), 0, 0.84, 0, 0, 0, 0, 1.1, 0.8, 1.1);
   } else if (outfit.bottom?.type === 'jeans') {
-    add(P.rig, new THREE.Mesh(SHARED_GEO.belt, mat(0x111827)), 0, 0.85, 0, Math.PI / 2, 0, 0);
-    add(P.rig, new THREE.Mesh(SHARED_GEO.buckle, mat(0xfacc15)), 0, 0.85, 0.2);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.belt, mat(0x111827)), 0, 0.95, 0, Math.PI / 2, 0, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.buckle, mat(0xfacc15)), 0, 0.95, 0.17);
   } else if (outfit.bottom?.type === 'shorts') {
     [P.legL, P.legR].forEach((leg) =>
-      add(leg.thigh, new THREE.Mesh(SHARED_GEO.shortsLeg, mat(outfit.bottom.main, 0.85)), 0, -0.08, 0));
+      add(leg.thigh, new THREE.Mesh(SHARED_GEO.shortsLeg, mat(outfit.bottom.main, 0.85)), 0, -0.09, 0));
   }
   /* Túi xách */
   if (outfit.bag?.type === 'crossbody') {
     const bagM = mat(outfit.bag.main);
-    add(P.rig, new THREE.Mesh(SHARED_GEO.bagStrap, bagM), 0, 1.02, 0.2, 0, 0, -0.83);
-    add(P.rig, new THREE.Mesh(SHARED_GEO.bag, bagM), 0.22, 0.82, 0.1, 0, 0, -0.15);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.bagStrap, bagM), 0, 1.2, 0.17, 0, 0, -0.83);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.bag, bagM), 0.19, 1.0, 0.08, 0, 0, -0.15);
   }
-  /* Giày bo tròn (không còn hộp vuông) */
+  /* Giày (cẳng chân giờ dài 0.42 — giày ở cuối cẳng) */
   [P.legL, P.legR].forEach((leg) => {
     if (outfit.shoes?.type === 'sneakers') {
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.shoeRound, mat(outfit.shoes.main, 0.5)), 0, -0.33, 0.06);
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.sole)), 0, -0.375, 0.06);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.shoeRound, mat(outfit.shoes.main, 0.5)), 0, -0.38, 0.05);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.sole)), 0, -0.42, 0.05);
     } else if (outfit.shoes?.type === 'maryjane') {
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.sock, white), 0, -0.2, 0);
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.shoeRound, mat(outfit.shoes.main, 0.5)), 0, -0.33, 0.06);
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.strap, mat(outfit.shoes.main)), 0, -0.3, 0.05);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.sock, white), 0, -0.22, 0);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.shoeRound, mat(outfit.shoes.main, 0.5)), 0, -0.38, 0.05);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.strap, mat(outfit.shoes.main)), 0, -0.34, 0.04);
     } else if (outfit.shoes?.type === 'boots') {
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.bootShaft, mat(outfit.shoes.main, 0.6)), 0, -0.24, 0);
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.shoeRound, mat(outfit.shoes.main, 0.5)), 0, -0.33, 0.06);
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.sole)), 0, -0.375, 0.06);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.bootShaft, mat(outfit.shoes.main, 0.6)), 0, -0.27, 0);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.shoeRound, mat(outfit.shoes.main, 0.5)), 0, -0.38, 0.05);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.sole)), 0, -0.42, 0.05);
     } else if (outfit.shoes?.type === 'sandals') {
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.main, 0.6)), 0, -0.37, 0.06);
-      add(leg.shin, new THREE.Mesh(SHARED_GEO.sandalStrap, mat(outfit.shoes.main)), 0, -0.33, 0.1);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.soleRound, mat(outfit.shoes.main, 0.6)), 0, -0.42, 0.05);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.sandalStrap, mat(outfit.shoes.main)), 0, -0.37, 0.08);
     }
   });
 }
 
 function buildCharacter(spec) {
   const outfit = OUTFITS[spec.outfit]?.[spec.outfitId] || Object.values(OUTFITS[spec.outfit])[0];
-  // Da có độ bóng nhẹ như da thật (clearcoat) thay vì matte phẳng
-  const skin = new THREE.MeshPhysicalMaterial({ color: spec.skin, roughness: 0.55, clearcoat: 0.35, clearcoatRoughness: 0.6 });
-  const shirt = new THREE.MeshStandardMaterial({ color: outfit.top.main, roughness: 0.8 });
+  // Cel-shading kiểu Genshin: da/áo/tóc dùng toon material (3 vùng sáng rõ rệt)
+  const skin = toonMat(spec.skin);
+  const shirt = toonMat(outfit.top.main);
   // Váy, váy liền và quần đùi để chân trần nên chân dùng màu da
   const legsSkin = ['skirt', 'dress', 'shorts'].includes(outfit.bottom.type);
-  const pants = new THREE.MeshStandardMaterial({ color: legsSkin ? spec.skin : outfit.bottom.main, roughness: 0.85 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: spec.hair, roughness: 0.85 });
+  const pants = toonMat(legsSkin ? spec.skin : outfit.bottom.main);
+  const hairMat = toonMat(spec.hair);
+  // Màu highlight cho tóc (sáng hơn ~45% để làm lọn tóc nổi)
+  const hairHi = toonMat(lightenHex(spec.hair, 0.45));
   const group = new THREE.Group();
   const rig = new THREE.Group(); group.add(rig);
-  // Chân dài hơn (đùi + cẳng) — nhân vật cao ~1,7
+  // Chân dài kiểu anime (đùi 0.44 + cẳng 0.42) — hông ở y 0.90, nhân vật cao ~1,85
   function makeLeg(side) {
-    const thigh = new THREE.Group(); thigh.position.set(0.095 * side, 0.78, 0); rig.add(thigh);
+    const thigh = new THREE.Group(); thigh.position.set(0.085 * side, 0.9, 0); rig.add(thigh);
     const tm = new THREE.Mesh(SHARED_GEO.thigh, pants); tm.castShadow = true; thigh.add(tm);
-    const shin = new THREE.Group(); shin.position.set(0, -0.38, 0); thigh.add(shin);
+    const shin = new THREE.Group(); shin.position.set(0, -0.44, 0); thigh.add(shin);
     const sm = new THREE.Mesh(SHARED_GEO.shin, pants); sm.castShadow = true; shin.add(sm);
     return { thigh, shin };
   }
   const legL = makeLeg(-1), legR = makeLeg(1);
-  // Thân thon có eo (lathe), không còn là capsule thẳng đuột
-  const body = new THREE.Mesh(SHARED_GEO.torso, shirt); body.position.y = 1.0; body.castShadow = true; rig.add(body);
-  // Tay dài hơn, tay phải cầm ly; bàn tay tròn có ngón cái
+  // Thân anime thon dài có eo (lathe), tâm ở y 1.18 (0.90–1.46)
+  const body = new THREE.Mesh(SHARED_GEO.torso, shirt); body.position.y = 1.18; body.castShadow = true; rig.add(body);
+  // Tay dài kiểu anime, tay phải cầm ly; bàn tay thon có ngón cái
   function makeArm(side) {
-    const upper = new THREE.Group(); upper.position.set(0.25 * side, 1.18, 0); rig.add(upper);
+    const upper = new THREE.Group(); upper.position.set(0.2 * side, 1.42, 0); rig.add(upper);
     const um = new THREE.Mesh(SHARED_GEO.upperArm, shirt); um.castShadow = true; upper.add(um);
-    const fore = new THREE.Group(); fore.position.set(0, -0.26, 0); upper.add(fore);
+    const fore = new THREE.Group(); fore.position.set(0, -0.3, 0); upper.add(fore);
     const fm = new THREE.Mesh(SHARED_GEO.foreArm, skin); fm.castShadow = true; fore.add(fm);
-    const hand = new THREE.Mesh(SHARED_GEO.hand, skin); hand.position.set(0, -0.26, 0); hand.castShadow = true; fore.add(hand);
-    const thumb = new THREE.Mesh(SHARED_GEO.thumb, skin); thumb.position.set(-0.05 * side, -0.25, 0.03); fore.add(thumb);
+    const hand = new THREE.Mesh(SHARED_GEO.hand, skin); hand.position.set(0, -0.28, 0); hand.castShadow = true; fore.add(hand);
+    const thumb = new THREE.Mesh(SHARED_GEO.thumb, skin); thumb.position.set(-0.04 * side, -0.27, 0.025); fore.add(thumb);
     return { upper, fore };
   }
   const armL = makeArm(-1), armR = makeArm(1);
-  const cupG = new THREE.Group(); cupG.position.set(0, -0.26, 0.04);
+  const cupG = new THREE.Group(); cupG.position.set(0, -0.28, 0.04);
   const cupM = new THREE.Mesh(SHARED_GEO.cup, MAT.cupWhite); cupM.castShadow = true; cupG.add(cupM);
   const cof = new THREE.Mesh(SHARED_GEO.coffeeTop, MAT.coffee); cof.position.y = 0.04; cupG.add(cof);
   armR.fore.add(cupG);
   cupG.visible = false; // bình thường tay không cầm ly, chỉ cầm khi đang uống
-  // Đầu to kiểu chibi: mắt to có hồn (tròng trắng + mống mắt + con ngươi +
-  // điểm sáng + mi trên), lông mày, mũi nhỏ, môi, má hồng, miệng cười, tai, cổ
-  const head = new THREE.Group(); head.position.y = 1.46; rig.add(head);
+  // Đầu anime: nhỏ hơn (r 0.19), mắt to lấp lánh, mi dày, lông mày mảnh, môi, má hồng
+  const head = new THREE.Group(); head.position.y = 1.66; rig.add(head);
   const headM = new THREE.Mesh(SHARED_GEO.head, skin); headM.castShadow = true; head.add(headM);
-  const neck = new THREE.Mesh(SHARED_GEO.neck, skin); neck.position.y = -0.24; head.add(neck);
-  const eyeWhiteM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 });
-  const irisM = new THREE.MeshStandardMaterial({ color: spec.eye ?? 0x5b3a1e, roughness: 0.25 });
-  const darkM = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 });
+  addOutline(head, SHARED_GEO.head, 1.04); // viền đậm quanh đầu kiểu anime
+  const neck = new THREE.Mesh(SHARED_GEO.neck, skin); neck.position.y = -0.16; head.add(neck);
+  const eyeWhiteM = toonMat(0xffffff);
+  const irisM = new THREE.MeshToonMaterial({ map: irisTexture(spec.eye ?? 0x5b3a1e), gradientMap: TOON_GRAD });
+  const darkM = toonMat(0x111111);
   const glintM = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  [-0.095, 0.095].forEach((x) => {
+  [-0.07, 0.07].forEach((x) => {
     const w = new THREE.Mesh(SHARED_GEO.eyeWhite, eyeWhiteM);
-    w.position.set(x, 0.045, 0.22); w.scale.set(1, 1.25, 0.45); head.add(w);
+    w.position.set(x, 0.03, 0.155); w.scale.set(1, 1.35, 0.4); head.add(w);
     const ir = new THREE.Mesh(SHARED_GEO.iris, irisM);
-    ir.position.set(x, 0.04, 0.245); ir.scale.set(1, 1.15, 0.5); head.add(ir);
+    ir.position.set(x, 0.028, 0.172); ir.scale.set(1, 1.25, 0.45); head.add(ir);
     const pu = new THREE.Mesh(SHARED_GEO.pupil, darkM);
-    pu.position.set(x, 0.04, 0.265); pu.scale.set(1, 1.2, 0.5); head.add(pu);
+    pu.position.set(x, 0.028, 0.185); pu.scale.set(1, 1.3, 0.45); head.add(pu);
     const gl = new THREE.Mesh(SHARED_GEO.glint, glintM);
-    gl.position.set(x + 0.014, 0.062, 0.272); head.add(gl);
+    gl.position.set(x + 0.012, 0.048, 0.19); head.add(gl);
+    const gl2 = new THREE.Mesh(SHARED_GEO.glint2, glintM);
+    gl2.position.set(x - 0.014, 0.012, 0.19); head.add(gl2);
+    // Mi trên dày + mi dưới mảnh
     const lash = new THREE.Mesh(SHARED_GEO.lash, darkM);
-    lash.position.set(x, 0.078, 0.232); lash.rotation.set(0.2, 0, Math.PI * 0.15); head.add(lash);
+    lash.position.set(x, 0.062, 0.162); lash.rotation.set(0.2, 0, Math.PI * 0.12); head.add(lash);
+    const lashLo = new THREE.Mesh(SHARED_GEO.lashLower, darkM);
+    lashLo.position.set(x, -0.012, 0.16); lashLo.rotation.set(0.15, 0, Math.PI * 1.15); head.add(lashLo);
     const brow = new THREE.Mesh(SHARED_GEO.brow, hairMat);
-    brow.position.set(x, 0.135, 0.235); brow.rotation.z = x < 0 ? 0.12 : -0.12; head.add(brow);
+    brow.position.set(x, 0.105, 0.165); brow.rotation.z = x < 0 ? 0.1 : -0.1; head.add(brow);
   });
-  const nose = new THREE.Mesh(SHARED_GEO.nose, skin); nose.position.set(0, -0.01, 0.255); head.add(nose);
+  const nose = new THREE.Mesh(SHARED_GEO.nose, skin); nose.position.set(0, -0.015, 0.185); head.add(nose);
   // Môi dưới hồng, hơi mọng
-  const lipM = new THREE.MeshStandardMaterial({ color: 0xe87a7a, roughness: 0.5 });
+  const lipM = toonMat(0xe87a7a);
   const lip = new THREE.Mesh(SHARED_GEO.lip, lipM);
-  lip.position.set(0, -0.125, 0.235); lip.scale.set(1.15, 0.55, 0.5); head.add(lip);
-  const blushM = new THREE.MeshStandardMaterial({ color: 0xfda4af, roughness: 0.9, transparent: true, opacity: 0.65 });
-  [-0.16, 0.16].forEach((x) => {
+  lip.position.set(0, -0.095, 0.172); lip.scale.set(1.1, 0.5, 0.45); head.add(lip);
+  const blushM = new THREE.MeshToonMaterial({ color: 0xfda4af, gradientMap: TOON_GRAD, transparent: true, opacity: 0.65 });
+  [-0.12, 0.12].forEach((x) => {
     const b = new THREE.Mesh(SHARED_GEO.blush, blushM);
-    b.position.set(x, -0.04, 0.2); b.scale.set(1, 0.7, 0.4); head.add(b);
+    b.position.set(x, -0.035, 0.145); b.scale.set(1, 0.7, 0.35); head.add(b);
   });
-  [-0.25, 0.25].forEach((x) => {
-    const ear = new THREE.Mesh(SHARED_GEO.ear, skin); ear.position.set(x, 0.02, 0); head.add(ear);
+  [-0.185, 0.185].forEach((x) => {
+    const ear = new THREE.Mesh(SHARED_GEO.ear, skin); ear.position.set(x, 0.01, 0); head.add(ear);
   });
   const smile = new THREE.Mesh(SHARED_GEO.smile, darkM);
-  smile.position.set(0, -0.08, 0.24); smile.rotation.set(0.15, 0, Math.PI); head.add(smile);
+  smile.position.set(0, -0.06, 0.175); smile.rotation.set(0.15, 0, Math.PI); head.add(smile);
   // Trang phục + phụ kiện theo bảng OUTFITS
-  buildOutfit(spec, outfit, { rig, head, legL, legR, body }, { skin, shirt, pants, hairMat });
+  buildOutfit(spec, outfit, { rig, head, legL, legR, body }, { skin, shirt, pants, hairMat, hairHi });
   // Bóng mềm dưới chân (gradient mờ dần, không viền cứng): hơi bầu dục và
   // lệch nhẹ ngược hướng mặt trời (mặt trời ở (14,22,10) nên bóng đổ về -x,-z)
   const shadowDisc = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.95), new THREE.MeshBasicMaterial({ map: SHADOW_TEX, transparent: true, depthWrite: false }));
@@ -1642,6 +1722,13 @@ function buildCharacter(spec) {
     }
   });
   return { group, rig, mats, parts: { body, head, legL, legR, armL, armR, cupG } };
+}
+// Làm sáng một màu hex (0xRRGGBB) về phía trắng theo hệ số f (0..1)
+function lightenHex(hex, f) {
+  const r = Math.min(255, ((hex >> 16) & 255) + (255 - ((hex >> 16) & 255)) * f);
+  const g = Math.min(255, ((hex >> 8) & 255) + (255 - ((hex >> 8) & 255)) * f);
+  const b = Math.min(255, (hex & 255) + (255 - (hex & 255)) * f);
+  return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
 }
 
 function spawnCharacter(id, name, spec, opts = {}) {
@@ -1683,7 +1770,7 @@ function sitDown(c, seat, instant = false) {
   c.group.position.set(seat.x, 0, seat.z);
   c.group.rotation.y = seat.angle;
   if (instant) {
-    c.pose = { ...c.poseTarget, thighL: -1.5, thighR: -1.5, shinL: 1.45, shinR: 1.45, rigY: -0.33, shL: -0.25, shR: -0.25 };
+    c.pose = { ...c.poseTarget, thighL: -1.5, thighR: -1.5, shinL: 1.45, shinR: 1.45, rigY: -0.42, shL: -0.25, shR: -0.25 };
   }
   if (c.id === 'me') publishMe(true);
 }
@@ -1735,7 +1822,7 @@ function updateCharacter(c, dt, t) {
     } else if (c.seat) {
       pt.thighL = -1.5; pt.thighR = -1.5; pt.shinL = 1.45; pt.shinR = 1.45;
       pt.shL = -0.25; pt.shR = -0.25; pt.foreL = -0.25; pt.foreR = -0.25;
-      pt.rigY = -0.33 + Math.sin(t * 1.8 + c.walkPhase) * 0.008;
+      pt.rigY = -0.42 + Math.sin(t * 1.8 + c.walkPhase) * 0.008;
       pt.headY = Math.sin(t * 0.4 + c.walkPhase) * 0.25;
       pt.headX = 0;
       let dr = c.seat.angle - c.group.rotation.y;
@@ -1788,7 +1875,7 @@ function updateCharacter(c, dt, t) {
   } else if (c.mode === 'sit') {
     pt.thighL = -1.5; pt.thighR = -1.5; pt.shinL = 1.45; pt.shinR = 1.45;
     pt.shL = -0.25; pt.shR = -0.25; pt.foreL = -0.25; pt.foreR = -0.25;
-    pt.rigY = -0.33 + Math.sin(t * 1.8 + c.walkPhase) * 0.008;
+    pt.rigY = -0.42 + Math.sin(t * 1.8 + c.walkPhase) * 0.008;
     pt.headY = Math.sin(t * 0.4 + c.walkPhase) * 0.25;
     pt.headX = 0;
   } else { // idle đứng
@@ -2077,7 +2164,7 @@ pvScene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.3));
 const pvDir = new THREE.DirectionalLight(0xffffff, 1.6);
 pvDir.position.set(3, 5, 4); pvScene.add(pvDir);
 const pvCam = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
-pvCam.position.set(0, 1.6, 4.2); pvCam.lookAt(0, 0.9, 0);
+pvCam.position.set(0, 1.7, 4.6); pvCam.lookAt(0, 1.0, 0);
 const pvDisc = new THREE.Mesh(new THREE.CircleGeometry(0.95, 28), new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.9 }));
 pvDisc.rotation.x = -Math.PI / 2; pvScene.add(pvDisc);
 let pvChar = null;
@@ -2365,6 +2452,7 @@ window.__cafeFront = () => {
 };
 window.__cafeCam = (x, y, z, tx, ty, tz) => {
   state.camMode = 0;
+  controls.minDistance = 0.5; // cho phép camera lại gần để chụp cận mặt (mặc định min 5m)
   camera.position.set(x, y, z);
   controls.target.set(tx, ty, tz);
 };
