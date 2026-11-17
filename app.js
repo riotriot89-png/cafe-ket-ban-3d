@@ -92,7 +92,8 @@ const state = {
   seats: [],          // {id, table, zone, x, z, angle, occupiedBy, cup}
   friends: new Set(JSON.parse(localStorage.getItem('cafe3d_friends') || '[]')),
   videoId: 'jfKfPfyJRdk', videoTitle: 'Lofi Girl — beats to relax/study to',
-  camMode: 0, // 0 toàn cảnh, 1 theo mình, 2 tivi
+  camMode: 0, // 0 toàn cảnh, 1 theo mình, 2 tivi, 3 góc nhìn thứ nhất
+  fpYaw: 0, fpPitch: 0, // góc nhìn thứ nhất: lệch hướng nhìn khi kéo chuột/chạm
 };
 const $ = (id) => document.getElementById(id);
 
@@ -749,7 +750,6 @@ function makeTable(tx, tz, zone) {
   for (let s = 0; s < 4; s++) {
     const a = s * Math.PI / 2 + Math.PI / 4;
     const sx = tx + Math.cos(a) * 1.0, sz = tz + Math.sin(a) * 1.0;
-    const faceA = a + Math.PI; // quay mặt vào bàn
     const chair = new THREE.Group();
     const seat = new THREE.Mesh(GEO.chairSeat, MAT.woodDark); seat.position.y = 0.45; seat.castShadow = true; chair.add(seat);
     const back = new THREE.Mesh(GEO.chairBack, MAT.woodDark); back.position.set(0, 0.75, -0.21); back.castShadow = true; chair.add(back);
@@ -757,13 +757,14 @@ function makeTable(tx, tz, zone) {
       const l = new THREE.Mesh(GEO.chairLeg, MAT.black); l.position.set(lx, 0.22, lz); chair.add(l);
     });
     chair.position.set(sx, 0, sz);
-    chair.rotation.y = -faceA + Math.PI / 2;
+    // Ghế quay thẳng về phía màn hình (+z, hướng người xem), không xếp vòng tròn quanh bàn
+    chair.rotation.y = 0;
     scene.add(chair);
     // ly cà phê hiện khi có người ngồi
     const tableCup = new THREE.Mesh(GEO.cup, MAT.cupWhite);
     tableCup.position.set(tx + Math.cos(a) * 0.38, 0.82, tz + Math.sin(a) * 0.38);
     tableCup.visible = false; scene.add(tableCup);
-    const seatObj = { id: state.seats.length, table: { x: tx, z: tz }, zone, x: sx, z: sz, angle: -a - Math.PI / 2, occupiedBy: null, cup: tableCup, chair };
+    const seatObj = { id: state.seats.length, table: { x: tx, z: tz }, zone, x: sx, z: sz, angle: 0, occupiedBy: null, cup: tableCup, chair };
     state.seats.push(seatObj);
     chair.traverse((o) => { if (o.isMesh) { o.userData.seat = seatObj; clickable.push(o); } });
     top.userData.seat = seatObj; clickable.push(top);
@@ -889,6 +890,20 @@ const SHARED_GEO = {
 SHARED_GEO.thigh.translate(0, -0.19, 0);
 SHARED_GEO.shin.translate(0, -0.18, 0);
 SHARED_GEO.upperArm.translate(0, -0.13, 0);
+
+// Bóng mềm dưới chân: texture gradient tròn (đậm ở giữa, mờ dần ra mép) để bóng
+// trông như bóng thật chứ không phải đĩa đen cứng có viền
+function makeShadowTexture() {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  const g = cv.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 4, 64, 64, 62);
+  grad.addColorStop(0, 'rgba(0,0,0,0.42)');
+  grad.addColorStop(0.55, 'rgba(0,0,0,0.22)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(cv);
+}
+const SHADOW_TEX = makeShadowTexture();
 SHARED_GEO.foreArm.translate(0, -0.12, 0);
 
 /* ---- Trang phục + phụ kiện: mỗi loại món đồ là 1 hàm dựng riêng,
@@ -1046,6 +1061,7 @@ function buildCharacter(spec) {
   const cupM = new THREE.Mesh(SHARED_GEO.cup, MAT.cupWhite); cupM.castShadow = true; cupG.add(cupM);
   const cof = new THREE.Mesh(SHARED_GEO.coffeeTop, MAT.coffee); cof.position.y = 0.04; cupG.add(cof);
   armR.fore.add(cupG);
+  cupG.visible = false; // bình thường tay không cầm ly, chỉ cầm khi đang uống
   // Đầu to kiểu chibi: mắt to, má hồng, miệng cười, tai
   const head = new THREE.Group(); head.position.y = 1.42; rig.add(head);
   const headM = new THREE.Mesh(SHARED_GEO.head, skin); headM.castShadow = true; head.add(headM);
@@ -1065,14 +1081,17 @@ function buildCharacter(spec) {
   smile.position.set(0, -0.08, 0.24); smile.rotation.set(0.15, 0, Math.PI); head.add(smile);
   // Trang phục + phụ kiện theo bảng OUTFITS
   buildOutfit(spec, outfit, { rig, head, legL, legR, body }, { skin, shirt, pants, hairMat });
-  // Bóng dưới chân
-  const shadowDisc = new THREE.Mesh(new THREE.CircleGeometry(0.36, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
-  shadowDisc.rotation.x = -Math.PI / 2; shadowDisc.position.y = 0.01; group.add(shadowDisc);
+  // Bóng mềm dưới chân (gradient mờ dần, không viền cứng)
+  const shadowDisc = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), new THREE.MeshBasicMaterial({ map: SHADOW_TEX, transparent: true, depthWrite: false }));
+  shadowDisc.rotation.x = -Math.PI / 2; shadowDisc.position.y = 0.02; group.add(shadowDisc);
   // Thu thập chất liệu riêng của nhân vật để làm mờ khi che tầm nhìn
   const mats = [];
   group.traverse((o) => {
     if (o.isMesh && o.material && o.material !== MAT.cupWhite && o.material !== MAT.coffee && !mats.includes(o.material)) {
       o.material.baseOpacity = o.material.opacity;
+      // Nhớ chất liệu nào vốn đã trong suốt (vd bóng mềm dùng texture alpha) để
+      // lúc làm mờ không tắt nhầm transparent, làm bóng thành hình đen đặc
+      o.material.userData.keepTransparent = o.material.transparent;
       mats.push(o.material);
     }
   });
@@ -1228,16 +1247,37 @@ function updateCharacter(c, dt, t) {
     pt.headY = Math.sin(t * 0.35 + c.walkPhase) * 0.3;
     pt.headX = 0;
   }
-  // Uống cà phê: tay phải nâng ly lên miệng (tỉ lệ chibi: khuỷu tay gập nhiều hơn)
+  // Uống trà/cà phê kiểu thật: với tay xuống bàn cầm ly lên, đưa lên miệng
+  // uống từng ngụm, rồi đặt ly xuống bàn (ly rời khỏi bàn và trở lại bàn)
   if (c.drink > 0) {
     c.drinkTimer += dt;
-    const d = Math.min(1, c.drinkTimer / 2.4);
-    const raise = smoothstep(0, 0.35, d) - smoothstep(0.65, 1, d);
-    pt.shR = -1.3 * raise + (pt.shR * (1 - raise));
-    pt.foreR = -1.5 * raise + (pt.foreR * (1 - raise));
-    pt.headX = -0.22 * raise;
-    c.parts.cupG.rotation.x = -0.45 * raise;
-    if (d >= 1) { c.drink = 0; c.drinkTimer = 0; c.parts.cupG.rotation.x = 0; }
+    const d = Math.min(1, c.drinkTimer / 3.6);
+    // Khung hình tay phải [thời điểm, vai, khuỷu]: với xuống bàn -> nâng lên miệng
+    // -> giữ ở miệng uống -> hạ xuống đặt ly -> về tư thế ngồi
+    const keys = [
+      [0.00, pt.shR, pt.foreR],
+      [0.25, -0.95, -0.35],
+      [0.50, -1.30, -1.55],
+      [0.75, -1.30, -1.55],
+      [0.90, -0.95, -0.35],
+      [1.00, pt.shR, pt.foreR],
+    ];
+    let i = 0;
+    while (i < keys.length - 2 && d > keys[i + 1][0]) i++;
+    const [t0, s0, f0] = keys[i], [t1, s1, f1] = keys[i + 1];
+    const k = smoothstep(0, 1, (d - t0) / Math.max(0.001, t1 - t0));
+    pt.shR = s0 + (s1 - s0) * k;
+    pt.foreR = f0 + (f1 - f0) * k;
+    // Đầu ngửa nhẹ khi uống
+    pt.headX = -0.22 * smoothstep(0.4, 0.55, d) * (1 - smoothstep(0.8, 0.95, d));
+    // Ly nghiêng khi uống (nhấp từng ngụm)
+    const sip = smoothstep(0.5, 0.6, d) * (1 - smoothstep(0.7, 0.8, d));
+    c.parts.cupG.rotation.x = -0.45 - 0.35 * sip;
+    // Cầm ly: ly rời khỏi bàn khi tay chạm bàn, trả lại bàn khi đặt xuống
+    const hasCup = d >= 0.25 && d < 0.9;
+    c.parts.cupG.visible = hasCup;
+    if (c.seat) c.seat.cup.visible = !hasCup;
+    if (d >= 1) { c.drink = 0; c.drinkTimer = 0; c.parts.cupG.rotation.x = 0; c.parts.cupG.visible = false; if (c.seat) c.seat.cup.visible = true; }
   }
   // Nội suy tư thế cho mượt
   const k = 1 - Math.exp(-dt * 9);
@@ -1327,8 +1367,17 @@ const ptr = new THREE.Vector2();
 floor.userData.floor = true; terraceFloor.userData.floor = true;
 clickable.push(floor, terraceFloor, tvScreen);
 let downX = 0, downY = 0, downType = 'mouse';
-renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; downType = e.pointerType; });
+let fpDown = false, fpLastX = 0, fpLastY = 0; // kéo để nhìn quanh ở góc nhìn thứ nhất
+renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; downType = e.pointerType; fpDown = true; fpLastX = e.clientX; fpLastY = e.clientY; });
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!fpDown || state.camMode !== 3) return;
+  const dx = e.clientX - fpLastX, dy = e.clientY - fpLastY;
+  fpLastX = e.clientX; fpLastY = e.clientY;
+  state.fpYaw -= dx * 0.005;
+  state.fpPitch = Math.max(-0.6, Math.min(0.6, state.fpPitch - dy * 0.005));
+});
 renderer.domElement.addEventListener('pointerup', (e) => {
+  fpDown = false;
   // Cảm ứng: cho phép lệch nhiều hơn khi xoay quán để khỏi bấm nhầm ghế
   if (Math.hypot(e.clientX - downX, e.clientY - downY) > (downType === 'touch' ? 14 : 6)) return;
   if (!state.entered) return;
@@ -1439,9 +1488,11 @@ const CAM_MODES = [
   { pos: [0, 15, 24], target: [0, 1, 2], label: 'Toàn cảnh quán' },
   { pos: null, target: null, label: 'Theo chân bạn' },
   { pos: [0, 3.4, 4], target: [0, 3.4, -9.7], label: 'Nhìn lên tivi' },
+  { pos: null, target: null, label: 'Góc nhìn thứ nhất' },
 ];
 $('btn-cam').addEventListener('click', () => {
   state.camMode = (state.camMode + 1) % CAM_MODES.length;
+  if (state.camMode === 3) { state.fpYaw = 0; state.fpPitch = 0; } // mới vào góc thứ nhất: nhìn thẳng hướng nhân vật
   const m = CAM_MODES[state.camMode];
   if (m.pos) {
     const pos = (state.camMode === 0 && IS_MOBILE) ? (isPortraitPhone() ? [0, 12, 19] : [0, 13, 22]) : m.pos;
@@ -1664,7 +1715,7 @@ function animate() {
     const target = blocking ? 0.12 : 1;
     c._fade = (c._fade ?? 1) + (target - (c._fade ?? 1)) * Math.min(1, dt * 8);
     for (const m of c.mats) {
-      m.transparent = c._fade < 0.99;
+      m.transparent = m.userData.keepTransparent || c._fade < 0.99;
       m.opacity = (m.baseOpacity ?? 1) * c._fade;
     }
   }
@@ -1678,6 +1729,8 @@ function animate() {
   // Bong bóng chat bám theo đầu nhân vật 3D
   for (const c of state.players.values()) {
     if (!c.bubbleEl) continue;
+    // Góc nhìn thứ nhất: bong bóng của chính mình ở ngay trước mắt nên ẩn đi
+    if (state.camMode === 3 && c.id === 'me') { c.bubbleEl.style.display = 'none'; continue; }
     c.parts.head.getWorldPosition(_pv);
     _pv.y += 0.4;
     _pv.project(camera);
@@ -1686,19 +1739,34 @@ function animate() {
     c.bubbleEl.style.left = ((_pv.x * 0.5 + 0.5) * innerWidth) + 'px';
     c.bubbleEl.style.top = ((-_pv.y * 0.5 + 0.5) * innerHeight) + 'px';
   }
-  // Camera theo chân người chơi
-  if (state.camMode === 1) {
-    const me = state.players.get('me');
-    if (me) {
-      _pv.set(me.group.position.x, 1.3, me.group.position.z);
-      const dx = (_pv.x - controls.target.x) * 0.07;
-      const dy = (_pv.y - controls.target.y) * 0.07;
-      const dz = (_pv.z - controls.target.z) * 0.07;
-      controls.target.x += dx; controls.target.y += dy; controls.target.z += dz;
-      camera.position.x += dx; camera.position.y += dy; camera.position.z += dz;
+  // Góc nhìn thứ nhất: camera ở đầu nhân vật, kéo để nhìn quanh (không dùng OrbitControls)
+  const me = state.players.get('me');
+  const isFP = state.camMode === 3 && me;
+  if (me) me.parts.head.visible = !isFP; // ẩn đầu của chính mình để camera không chui vào trong đầu
+  controls.enabled = !isFP;
+  if (isFP) {
+    me.parts.head.getWorldPosition(_pv);
+    const yaw = me.group.rotation.y + state.fpYaw;
+    const cp = Math.cos(state.fpPitch), sp = Math.sin(state.fpPitch);
+    camera.position.set(_pv.x, _pv.y + 0.05, _pv.z);
+    camera.lookAt(_pv.x + Math.sin(yaw) * cp * 10, _pv.y + 0.05 + sp * 10, _pv.z + Math.cos(yaw) * cp * 10);
+    // Đặt target ảo phía trước để tính mờ nhân vật che tầm nhìn cho đúng
+    controls.target.set(_pv.x + Math.sin(yaw) * cp * 8, _pv.y + 0.05 + sp * 8, _pv.z + Math.cos(yaw) * cp * 8);
+  } else {
+    // Camera theo chân người chơi
+    if (state.camMode === 1) {
+      const me2 = state.players.get('me');
+      if (me2) {
+        _pv.set(me2.group.position.x, 1.3, me2.group.position.z);
+        const dx = (_pv.x - controls.target.x) * 0.07;
+        const dy = (_pv.y - controls.target.y) * 0.07;
+        const dz = (_pv.z - controls.target.z) * 0.07;
+        controls.target.x += dx; controls.target.y += dy; controls.target.z += dz;
+        camera.position.x += dx; camera.position.y += dy; camera.position.z += dz;
+      }
     }
+    controls.update();
   }
-  controls.update();
   renderer.render(scene, camera);
   cssRenderer.render(scene, camera);
   if (pvChar && !$('welcome').classList.contains('hidden')) {
@@ -1726,6 +1794,15 @@ window.__cafeDebug = () => [...state.players.values()].map((c) => ({
   id: c.id, mode: c.mode, x: +c.group.position.x.toFixed(1), z: +c.group.position.z.toFixed(1),
   path: c.path.length, seat: c.seat ? c.seat.id : null, drink: c.drink, fade: +(c._fade ?? 1).toFixed(2),
 }));
+window.__cafePose = () => {
+  const me = state.players.get('me');
+  if (!me) return null;
+  return {
+    drink: me.drink, drinkTimer: +me.drinkTimer.toFixed(2),
+    shR: +me.pose.shR.toFixed(2), foreR: +me.pose.foreR.toFixed(2),
+    cupInHand: me.parts.cupG.visible, tableCup: me.seat ? me.seat.cup.visible : null,
+  };
+};
 window.__cafeTV = { isOn: () => true };
 window.__cafeQueue = {
   add: (id) => addToQueue(id, 'Test'),
