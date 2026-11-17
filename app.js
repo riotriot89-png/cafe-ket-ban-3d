@@ -23,6 +23,29 @@ const OUTFITS = {
       bottom: { type: 'cargo', main: 0x4d7c0f, pocket: 0x3f6212 },
       shoes: { type: 'sneakers', main: 0xffffff, sole: 0xe11d48 },
     },
+    denim: {
+      label: 'Denim',
+      hair: { type: 'short' },
+      top: { type: 'denim', main: 0x3b82f6, pocket: 0x1e40af },
+      bottom: { type: 'jeans', main: 0x1e3a5f },
+      shoes: { type: 'sneakers', main: 0xffffff, sole: 0x3b82f6 },
+    },
+    sport: {
+      label: 'Thể thao',
+      hat: { type: 'headband', main: 0xe11d48 },
+      hair: { type: 'curly' },
+      top: { type: 'sport', main: 0xf97316, stripe: 0xffffff },
+      bottom: { type: 'shorts', main: 0x1e3a5f },
+      shoes: { type: 'sneakers', main: 0xffffff, sole: 0xf97316 },
+    },
+    winter: {
+      label: 'Mùa đông',
+      hat: { type: 'beanie', main: 0xdc2626, pom: 0xffffff },
+      hair: { type: 'short' },
+      top: { type: 'sweater', main: 0x15803d },
+      bottom: { type: 'jeans', main: 0x374151 },
+      shoes: { type: 'boots', main: 0x78350f, sole: 0x451a03 },
+    },
   },
   female: {
     chic: {
@@ -34,6 +57,29 @@ const OUTFITS = {
       shoes: { type: 'maryjane', main: 0x9d174d },
       bag: { type: 'crossbody', main: 0xfbbf24 },
     },
+    denim: {
+      label: 'Denim',
+      hair: { type: 'bob' },
+      top: { type: 'denim', main: 0x60a5fa, pocket: 0x1e40af },
+      bottom: { type: 'jeans', main: 0x1e3a5f },
+      shoes: { type: 'sneakers', main: 0xffffff, sole: 0xec4899 },
+    },
+    summer: {
+      label: 'Mùa hè',
+      hat: { type: 'sunhat', main: 0xfacc15, band: 0xec4899 },
+      hair: { type: 'ponytail' },
+      top: { type: 'dress', main: 0xfde68a, belt: 0xec4899 },
+      bottom: { type: 'dress', main: 0xfde68a },
+      shoes: { type: 'sandals', main: 0xd97706 },
+    },
+    winter: {
+      label: 'Mùa đông',
+      hat: { type: 'beanie', main: 0xec4899, pom: 0xffffff },
+      hair: { type: 'bun' },
+      top: { type: 'sweater', main: 0xdb2777 },
+      bottom: { type: 'leggings', main: 0x111827 },
+      shoes: { type: 'boots', main: 0x78350f, sole: 0x451a03 },
+    },
   },
 };
 const RANDOM_NAMES = ['Minh Anh','Thu Hằng','Quốc Anh','Lan Chi','Hoàng Phúc','Thảo Nguyên','Đức Huy','Phương Thảo'];
@@ -41,7 +87,7 @@ const ZONE_NAMES = { hall: 'Sảnh chính', terrace: 'Sân vườn', lounge: 'Lo
 
 /* ============ TRẠNG THÁI ============ */
 const state = {
-  myId: 'me', myName: '', myChar: 0, entered: false,
+  myId: 'me', myName: '', myChar: 0, myOutfit: '', entered: false,
   players: new Map(), // id -> charObj
   seats: [],          // {id, table, zone, x, z, angle, occupiedBy, cup}
   friends: new Set(JSON.parse(localStorage.getItem('cafe3d_friends') || '[]')),
@@ -124,6 +170,7 @@ function myStateData() {
   return {
     name: state.myName || 'Khách',
     char: state.myChar,
+    outfit: state.myOutfit || CHARACTERS[state.myChar].outfitId,
     x: me ? +me.group.position.x.toFixed(2) : 0,
     z: me ? +me.group.position.z.toFixed(2) : 15.5,
     rotY: me ? +me.group.rotation.y.toFixed(2) : Math.PI,
@@ -149,7 +196,8 @@ function listenPlayers() {
     if (!d || id === myFbId) return;
     if (Date.now() - (d.at || 0) > 90000) { snap.ref.remove(); return; }
     if (state.players.has(id)) return;
-    const spec = CHARACTERS[d.char] || CHARACTERS[0];
+    const base = CHARACTERS[d.char] || CHARACTERS[0];
+    const spec = { ...base, outfitId: d.outfit || base.outfitId };
     const c = spawnCharacter(id, d.name || 'Khách', spec, { x: d.x ?? 0, z: d.z ?? 15.5, rotY: d.rotY ?? 0 });
     c.isRemote = true;
     c.tx = d.x ?? 0; c.tz = d.z ?? 15.5; c.trotY = d.rotY ?? 0;
@@ -162,6 +210,18 @@ function listenPlayers() {
     if (Date.now() - (d.at || 0) > 90000) { snap.ref.remove(); return; }
     const c = state.players.get(id);
     if (!c) return;
+    // Người kia đổi nhân vật / trang phục -> dựng lại nhân vật cho họ
+    const base = CHARACTERS[d.char] || CHARACTERS[0];
+    const newOutfit = d.outfit || base.outfitId;
+    if (c.spec.name !== base.name || c.spec.outfitId !== newOutfit) {
+      removeCharacter(id);
+      const spec = { ...base, outfitId: newOutfit };
+      const nc = spawnCharacter(id, d.name || 'Khách', spec, { x: d.x ?? 0, z: d.z ?? 15.5, rotY: d.rotY ?? 0 });
+      nc.isRemote = true;
+      nc.tx = d.x ?? 0; nc.tz = d.z ?? 15.5; nc.trotY = d.rotY ?? 0;
+      applyRemoteState(nc, d);
+      return;
+    }
     c.tx = d.x ?? c.tx; c.tz = d.z ?? c.tz; c.trotY = d.rotY ?? c.trotY;
     applyRemoteState(c, d);
     // Ghế mình đang giữ bị người khác ngồi mà họ giữ trước -> nhường ghế
@@ -799,6 +859,32 @@ const SHARED_GEO = {
   strap: new THREE.BoxGeometry(0.13, 0.02, 0.04),
   bag: new THREE.BoxGeometry(0.14, 0.16, 0.05),
   bagStrap: new THREE.BoxGeometry(0.03, 0.6, 0.02),
+  hairShort: new THREE.SphereGeometry(0.27, 20, 12),
+  curl: new THREE.SphereGeometry(0.1, 10, 8),
+  bobSide: new THREE.BoxGeometry(0.09, 0.28, 0.12),
+  tail: new THREE.CylinderGeometry(0.06, 0.04, 0.4, 8),
+  tailTie: new THREE.SphereGeometry(0.07, 10, 8),
+  bun: new THREE.SphereGeometry(0.1, 12, 10),
+  beanieDome: new THREE.SphereGeometry(0.27, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+  beanieBrim: new THREE.CylinderGeometry(0.27, 0.27, 0.07, 20),
+  pom: new THREE.SphereGeometry(0.06, 10, 8),
+  sunBrim: new THREE.CylinderGeometry(0.4, 0.4, 0.02, 20),
+  sunDome: new THREE.SphereGeometry(0.22, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+  sunBand: new THREE.TorusGeometry(0.22, 0.025, 8, 20),
+  headband: new THREE.TorusGeometry(0.26, 0.03, 8, 20),
+  chestPocket: new THREE.BoxGeometry(0.09, 0.1, 0.02),
+  zipper: new THREE.BoxGeometry(0.02, 0.42, 0.015),
+  stripe: new THREE.BoxGeometry(0.32, 0.06, 0.02),
+  turtle: new THREE.CylinderGeometry(0.13, 0.15, 0.1, 16),
+  dress: new THREE.CylinderGeometry(0.2, 0.42, 0.7, 20),
+  dressBelt: new THREE.TorusGeometry(0.24, 0.02, 8, 20),
+  belt: new THREE.TorusGeometry(0.2, 0.02, 8, 20),
+  buckle: new THREE.BoxGeometry(0.05, 0.03, 0.02),
+  shortsLeg: new THREE.CylinderGeometry(0.09, 0.085, 0.2, 10),
+  boot: new THREE.BoxGeometry(0.14, 0.12, 0.28),
+  bootShaft: new THREE.CylinderGeometry(0.062, 0.06, 0.2, 10),
+  sandalSole: new THREE.BoxGeometry(0.14, 0.03, 0.28),
+  sandalStrap: new THREE.BoxGeometry(0.13, 0.015, 0.05),
 };
 SHARED_GEO.thigh.translate(0, -0.19, 0);
 SHARED_GEO.shin.translate(0, -0.18, 0);
@@ -818,6 +904,22 @@ function buildOutfit(spec, outfit, P, M) {
   if (outfit.hair?.type === 'spiky') {
     [[-0.23, 0.0, -0.12], [0.23, 0.0, -0.12], [0, -0.02, -0.24]].forEach(([x, y, z]) =>
       add(P.head, new THREE.Mesh(SHARED_GEO.hairCone, M.hairMat), x, y, z, x * 1.2, 0, x * -1.2));
+  } else if (outfit.hair?.type === 'short') {
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.1, -0.02, 0, 0, 0, 1, 0.5, 1);
+  } else if (outfit.hair?.type === 'curly') {
+    [[0, 0.2, 0], [-0.13, 0.14, 0.06], [0.13, 0.14, 0.06], [-0.07, 0.16, -0.12], [0.08, 0.15, -0.12]].forEach(([x, y, z]) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.curl, M.hairMat), x, y, z));
+  } else if (outfit.hair?.type === 'bob') {
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.08, -0.02, 0, 0, 0, 1, 0.7, 1);
+    [-0.2, 0.2].forEach((x) =>
+      add(P.head, new THREE.Mesh(SHARED_GEO.bobSide, M.hairMat), x, -0.08, 0.05));
+  } else if (outfit.hair?.type === 'ponytail') {
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.1, -0.02, 0, 0, 0, 1, 0.6, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.tail, M.hairMat), 0, -0.15, -0.28, 0.5, 0, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.tailTie, mat(0xec4899)), 0, 0.05, -0.27);
+  } else if (outfit.hair?.type === 'bun') {
+    add(P.head, new THREE.Mesh(SHARED_GEO.hairShort, M.hairMat), 0, 0.1, -0.02, 0, 0, 0, 1, 0.6, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.bun, M.hairMat), 0, 0.28, -0.05);
   } else if (outfit.hair?.type === 'long') {
     add(P.head, new THREE.Mesh(SHARED_GEO.bang, M.hairMat), 0, 0.12, -0.03, 0, 0, 0, 1, 0.5, 1);
     add(P.head, new THREE.Mesh(SHARED_GEO.hairBack, M.hairMat), 0, -0.24, -0.2, 0, 0, 0, 1, 1, 0.5);
@@ -839,6 +941,16 @@ function buildOutfit(spec, outfit, P, M) {
   } else if (outfit.hat?.type === 'beret') {
     add(P.head, new THREE.Mesh(SHARED_GEO.beret, mat(outfit.hat.main)), 0.08, 0.2, 0, 0, 0, -0.25, 1, 0.35, 1);
     add(P.head, new THREE.Mesh(SHARED_GEO.beretStem, mat(outfit.hat.main)), 0.14, 0.3, 0, 0, 0, -0.25);
+  } else if (outfit.hat?.type === 'beanie') {
+    add(P.head, new THREE.Mesh(SHARED_GEO.beanieDome, mat(outfit.hat.main)), 0, 0.12, 0, 0, 0, 0, 1, 0.6, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.beanieBrim, mat(outfit.hat.main)), 0, 0.08, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.pom, mat(outfit.hat.pom)), 0, 0.3, 0);
+  } else if (outfit.hat?.type === 'sunhat') {
+    add(P.head, new THREE.Mesh(SHARED_GEO.sunBrim, mat(outfit.hat.main)), 0, 0.14, 0);
+    add(P.head, new THREE.Mesh(SHARED_GEO.sunDome, mat(outfit.hat.main)), 0, 0.14, 0, 0, 0, 0, 1, 0.7, 1);
+    add(P.head, new THREE.Mesh(SHARED_GEO.sunBand, mat(outfit.hat.band)), 0, 0.16, 0, Math.PI / 2, 0, 0);
+  } else if (outfit.hat?.type === 'headband') {
+    add(P.head, new THREE.Mesh(SHARED_GEO.headband, mat(outfit.hat.main)), 0, 0.1, 0, 0.25, 0, 0);
   }
   /* Áo */
   if (outfit.top?.type === 'hoodie') {
@@ -846,6 +958,19 @@ function buildOutfit(spec, outfit, P, M) {
     add(P.rig, new THREE.Mesh(SHARED_GEO.pocket, mat(outfit.top.pocket)), 0, 0.88, 0.18);
   } else if (outfit.top?.type === 'blouse') {
     add(P.rig, new THREE.Mesh(SHARED_GEO.collar, white), 0, 1.24, 0, Math.PI / 2, 0, 0);
+  } else if (outfit.top?.type === 'denim') {
+    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, mat(outfit.top.pocket)), 0, 1.24, 0, Math.PI / 2, 0, 0);
+    [-0.09, 0.09].forEach((x) =>
+      add(P.rig, new THREE.Mesh(SHARED_GEO.chestPocket, mat(outfit.top.pocket)), x, 1.15, 0.185));
+    add(P.rig, new THREE.Mesh(SHARED_GEO.zipper, mat(outfit.top.pocket)), 0, 1.05, 0.19);
+  } else if (outfit.top?.type === 'sport') {
+    add(P.rig, new THREE.Mesh(SHARED_GEO.stripe, mat(outfit.top.stripe)), 0, 1.15, 0.185);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.collar, white), 0, 1.24, 0, Math.PI / 2, 0, 0);
+  } else if (outfit.top?.type === 'sweater') {
+    add(P.rig, new THREE.Mesh(SHARED_GEO.turtle, M.shirt), 0, 1.34, 0);
+  } else if (outfit.top?.type === 'dress') {
+    add(P.rig, new THREE.Mesh(SHARED_GEO.dress, M.shirt), 0, 0.85, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.dressBelt, mat(outfit.top.belt)), 0, 1.0, 0, Math.PI / 2, 0, 0);
   }
   /* Quần / váy */
   if (outfit.bottom?.type === 'cargo') {
@@ -854,6 +979,12 @@ function buildOutfit(spec, outfit, P, M) {
   } else if (outfit.bottom?.type === 'skirt') {
     add(P.rig, new THREE.Mesh(SHARED_GEO.skirt, mat(outfit.bottom.main, 0.8)), 0, 0.62, 0);
     add(P.rig, new THREE.Mesh(SHARED_GEO.waistband, mat(outfit.bottom.band)), 0, 0.79, 0, Math.PI / 2, 0, 0);
+  } else if (outfit.bottom?.type === 'jeans') {
+    add(P.rig, new THREE.Mesh(SHARED_GEO.belt, mat(0x111827)), 0, 0.85, 0, Math.PI / 2, 0, 0);
+    add(P.rig, new THREE.Mesh(SHARED_GEO.buckle, mat(0xfacc15)), 0, 0.85, 0.2);
+  } else if (outfit.bottom?.type === 'shorts') {
+    [P.legL, P.legR].forEach((leg) =>
+      add(leg.thigh, new THREE.Mesh(SHARED_GEO.shortsLeg, mat(outfit.bottom.main, 0.85)), 0, -0.08, 0));
   }
   /* Túi xách */
   if (outfit.bag?.type === 'crossbody') {
@@ -870,16 +1001,24 @@ function buildOutfit(spec, outfit, P, M) {
       add(leg.shin, new THREE.Mesh(SHARED_GEO.sock, white), 0, -0.2, 0);
       add(leg.shin, new THREE.Mesh(SHARED_GEO.shoe, mat(outfit.shoes.main, 0.5)), 0, -0.34, 0.05);
       add(leg.shin, new THREE.Mesh(SHARED_GEO.strap, mat(outfit.shoes.main)), 0, -0.3, 0.05);
+    } else if (outfit.shoes?.type === 'boots') {
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.bootShaft, mat(outfit.shoes.main, 0.6)), 0, -0.24, 0);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.boot, mat(outfit.shoes.main, 0.5)), 0, -0.33, 0.05);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.sole, mat(outfit.shoes.sole)), 0, -0.375, 0.05);
+    } else if (outfit.shoes?.type === 'sandals') {
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.sandalSole, mat(outfit.shoes.main, 0.6)), 0, -0.37, 0.05);
+      add(leg.shin, new THREE.Mesh(SHARED_GEO.sandalStrap, mat(outfit.shoes.main)), 0, -0.33, 0.1);
     }
   });
 }
 
 function buildCharacter(spec) {
-  const outfit = OUTFITS[spec.outfit][spec.outfitId];
+  const outfit = OUTFITS[spec.outfit]?.[spec.outfitId] || Object.values(OUTFITS[spec.outfit])[0];
   const skin = new THREE.MeshStandardMaterial({ color: spec.skin, roughness: 0.65 });
   const shirt = new THREE.MeshStandardMaterial({ color: outfit.top.main, roughness: 0.8 });
-  // Nữ mặc váy nên chân dùng màu da, nam mặc quần theo bộ đồ
-  const pants = new THREE.MeshStandardMaterial({ color: spec.outfit === 'female' ? spec.skin : outfit.bottom.main, roughness: 0.85 });
+  // Váy, váy liền và quần đùi để chân trần nên chân dùng màu da
+  const legsSkin = ['skirt', 'dress', 'shorts'].includes(outfit.bottom.type);
+  const pants = new THREE.MeshStandardMaterial({ color: legsSkin ? spec.skin : outfit.bottom.main, roughness: 0.85 });
   const hairMat = new THREE.MeshStandardMaterial({ color: spec.hair, roughness: 0.85 });
   const group = new THREE.Group();
   const rig = new THREE.Group(); group.add(rig);
@@ -1333,11 +1472,30 @@ pvCam.position.set(0, 1.6, 4.2); pvCam.lookAt(0, 0.9, 0);
 const pvDisc = new THREE.Mesh(new THREE.CircleGeometry(0.95, 28), new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.9 }));
 pvDisc.rotation.x = -Math.PI / 2; pvScene.add(pvDisc);
 let pvChar = null;
-function showPreview(i) {
+function showPreview(i, outfitId) {
   if (pvChar) pvScene.remove(pvChar.group);
-  const b = buildCharacter(CHARACTERS[i]);
+  const spec = { ...CHARACTERS[i], outfitId: outfitId || state.myOutfit || CHARACTERS[i].outfitId };
+  const b = buildCharacter(spec);
   pvScene.add(b.group);
   pvChar = b;
+}
+/* Ô chọn trang phục ở màn chào: mỗi nhân vật có 4 bộ, bấm là xem trước ngay */
+function renderOutfits(charIdx) {
+  const spec = CHARACTERS[charIdx];
+  const grid = $('outfit-grid');
+  grid.innerHTML = '';
+  Object.entries(OUTFITS[spec.outfit]).forEach(([id, o]) => {
+    const b = document.createElement('button');
+    b.className = 'outfit-btn' + (id === state.myOutfit ? ' active' : '');
+    b.textContent = o.label;
+    b.addEventListener('click', () => {
+      state.myOutfit = id;
+      localStorage.setItem('cafe3d_outfit_' + charIdx, id);
+      renderOutfits(charIdx);
+      showPreview(charIdx, id);
+    });
+    grid.appendChild(b);
+  });
 }
 const grid = $('char-grid');
 CHARACTERS.forEach((ch, i) => {
@@ -1346,8 +1504,10 @@ CHARACTERS.forEach((ch, i) => {
   btn.innerHTML = `<b>${ch.name}</b><small>${ch.gender}</small>`;
   btn.addEventListener('click', () => {
     state.myChar = i;
+    state.myOutfit = localStorage.getItem('cafe3d_outfit_' + i) || ch.outfitId;
     grid.querySelectorAll('.char-card').forEach((el) => el.classList.remove('selected'));
     btn.classList.add('selected');
+    renderOutfits(i);
     showPreview(i);
   });
   grid.appendChild(btn);
@@ -1372,10 +1532,11 @@ function enterCafe() {
   state.myName = name;
   $('welcome').classList.add('hidden');
   if (state.players.has('me')) removeCharacter('me');
-  spawnCharacter('me', name, CHARACTERS[state.myChar], { x: 0, z: 15.5 });
+  spawnCharacter('me', name, { ...CHARACTERS[state.myChar], outfitId: state.myOutfit || CHARACTERS[state.myChar].outfitId }, { x: 0, z: 15.5 });
   state.entered = true;
   localStorage.setItem('cafe3d_name', name);
   localStorage.setItem('cafe3d_char', String(state.myChar));
+  localStorage.setItem('cafe3d_outfit_' + state.myChar, state.myOutfit || CHARACTERS[state.myChar].outfitId);
   camera.position.set(0, IS_MOBILE ? 8 : 9, IS_MOBILE ? 15 : 20);
   controls.target.set(0, 1, 8);
   log(`<span class="sys">🎉 ${escapeHtml(name)} vừa vào quán! Có ${state.players.size} người đang ở đây.</span>`);
@@ -1391,13 +1552,17 @@ $('btn-enter').addEventListener('click', enterCafe);
 $('player-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') enterCafe(); });
 
 /* ============ KHỞI TẠO QUÁN ============ */
+state.myOutfit = localStorage.getItem('cafe3d_outfit_0') || CHARACTERS[0].outfitId;
+renderOutfits(0);
 showPreview(0);
 const savedName = localStorage.getItem('cafe3d_name');
 if (savedName) $('player-name').value = savedName;
 const savedChar = parseInt(localStorage.getItem('cafe3d_char') || '0', 10);
 if (CHARACTERS[savedChar]) {
   state.myChar = savedChar;
+  state.myOutfit = localStorage.getItem('cafe3d_outfit_' + savedChar) || CHARACTERS[savedChar].outfitId;
   grid.querySelectorAll('.char-card').forEach((el, i) => el.classList.toggle('selected', i === savedChar));
+  renderOutfits(savedChar);
   showPreview(savedChar);
 }
 log('<span class="sys">☕ Chào mừng đến Café Kết Bạn 3D — quán có 100 ghế, chọn nhân vật rồi vào chơi nhé!</span>');
@@ -1413,7 +1578,10 @@ if (qp.has('autojoin')) {
   const ch = parseInt(qp.get('char') || '0', 10);
   if (CHARACTERS[ch]) {
     state.myChar = ch;
+    const outfitParam = qp.get('outfit');
+    state.myOutfit = (outfitParam && OUTFITS[CHARACTERS[ch].outfit]?.[outfitParam]) ? outfitParam : (localStorage.getItem('cafe3d_outfit_' + ch) || CHARACTERS[ch].outfitId);
     grid.querySelectorAll('.char-card').forEach((el, i) => el.classList.toggle('selected', i === ch));
+    renderOutfits(ch);
     showPreview(ch);
   }
   setTimeout(() => {
