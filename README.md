@@ -8,7 +8,8 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
 - **Quán 3D kiểu gaming**: sàn gỗ, tường neon, bảng hiệu phát sáng, quầy bar,
   sân vườn có dây đèn, góc lounge có sofa và thảm.
 - **100 ghế** chia 3 khu: Sảnh chính (48 ghế), Sân vườn (32 ghế), Lounge (20 ghế).
-  Tất cả ghế quay thẳng về phía màn hình (hướng người xem), không xếp vòng tròn quanh bàn.
+  Mỗi bàn tròn to (r 0,78) có 4 ghế xếp ở nửa dưới (phía nam) của bàn, tất cả hướng mặt
+  lên trên về phía tivi — ngồi xuống là quay mặt ra bàn và nhìn lên tivi.
 - **Nhân vật 3D chibi thời trang, cao ~1,7**: chỉ 2 nhân vật — **Milo (nam)**: bộ Street
   (snapback đen vành đỏ có logo, hoodie kem túi kangaroo đỏ, quần cargo rêu có túi hộp,
   giày sneaker trắng đế đỏ); **Luna (nữ)**: bộ Chic (mũ beret hồng, nơ hồng, tóc dài mái ngang,
@@ -16,7 +17,8 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   Đầu to, mắt to, má hồng, miệng cười — đi bộ, ngồi xuống ghế, nâng ly uống cà phê, thở,
   chớp mắt, quay đầu. Bóng dưới chân là bóng mềm (gradient mờ dần) chứ không phải đĩa đen cứng.
   Uống trà/cà phê kiểu thật: tay với xuống bàn cầm ly lên, đưa lên miệng uống từng ngụm
-  rồi đặt ly xuống bàn (bình thường tay không cầm ly).
+  rồi đặt ly xuống bàn (bình thường tay không cầm ly). Ly đặt trên bàn ngay trước mặt
+  người ngồi nên tay với tới bàn là khớp.
   Màn chọn nhân vật có xem trước 3D xoay vòng. Trang phục được tách thành bảng dữ
   liệu `OUTFITS` trong app.js: thêm bộ đồ mới cho người chơi mua chỉ cần thêm 1 entry,
   không phải sửa code dựng nhân vật.

@@ -375,9 +375,9 @@ const MAT = {
   coffee: new THREE.MeshStandardMaterial({ color: 0x3b2314, roughness: 0.2 }),
 };
 const GEO = {
-  tableTop: new THREE.CylinderGeometry(0.62, 0.62, 0.06, 24),
+  tableTop: new THREE.CylinderGeometry(0.78, 0.78, 0.06, 24),
   tableLeg: new THREE.CylinderGeometry(0.06, 0.06, 0.72, 12),
-  tableBase: new THREE.CylinderGeometry(0.34, 0.38, 0.05, 20),
+  tableBase: new THREE.CylinderGeometry(0.42, 0.46, 0.05, 20),
   chairSeat: new THREE.BoxGeometry(0.46, 0.08, 0.46),
   chairBack: new THREE.BoxGeometry(0.46, 0.55, 0.06),
   chairLeg: new THREE.BoxGeometry(0.06, 0.45, 0.06),
@@ -747,9 +747,10 @@ function makeTable(tx, tz, zone) {
   const base = new THREE.Mesh(GEO.tableBase, MAT.black); base.position.set(tx, 0.03, tz); addMesh(base);
   // ly trang trí giữa bàn
   const cup = new THREE.Mesh(GEO.cup, MAT.cupWhite); cup.position.set(tx + 0.18, 0.82, tz - 0.1); addMesh(cup);
+  // 4 ghế ở nửa dưới (phía nam) của bàn, tất cả hướng mặt lên trên (về phía tivi)
   for (let s = 0; s < 4; s++) {
-    const a = s * Math.PI / 2 + Math.PI / 4;
-    const sx = tx + Math.cos(a) * 1.0, sz = tz + Math.sin(a) * 1.0;
+    const a = Math.PI * (s + 1) / 5; // 36°, 72°, 108°, 144°: nửa dưới của bàn
+    const sx = tx + Math.cos(a) * 1.15, sz = tz + Math.sin(a) * 1.15;
     const chair = new THREE.Group();
     const seat = new THREE.Mesh(GEO.chairSeat, MAT.woodDark); seat.position.y = 0.45; seat.castShadow = true; chair.add(seat);
     const back = new THREE.Mesh(GEO.chairBack, MAT.woodDark); back.position.set(0, 0.75, -0.21); back.castShadow = true; chair.add(back);
@@ -757,14 +758,14 @@ function makeTable(tx, tz, zone) {
       const l = new THREE.Mesh(GEO.chairLeg, MAT.black); l.position.set(lx, 0.22, lz); chair.add(l);
     });
     chair.position.set(sx, 0, sz);
-    // Ghế quay thẳng về phía màn hình (+z, hướng người xem), không xếp vòng tròn quanh bàn
-    chair.rotation.y = 0;
+    // Ghế hướng mặt lên trên (về phía tivi, -z): lưng ghế quay về phía người xem
+    chair.rotation.y = Math.PI;
     scene.add(chair);
-    // ly cà phê hiện khi có người ngồi
+    // ly cà phê hiện khi có người ngồi: đặt trên bàn ngay trước mặt người ngồi
     const tableCup = new THREE.Mesh(GEO.cup, MAT.cupWhite);
-    tableCup.position.set(tx + Math.cos(a) * 0.38, 0.82, tz + Math.sin(a) * 0.38);
+    tableCup.position.set(tx + Math.cos(a) * 0.6, 0.82, tz + Math.sin(a) * 0.6);
     tableCup.visible = false; scene.add(tableCup);
-    const seatObj = { id: state.seats.length, table: { x: tx, z: tz }, zone, x: sx, z: sz, angle: 0, occupiedBy: null, cup: tableCup, chair };
+    const seatObj = { id: state.seats.length, table: { x: tx, z: tz }, zone, x: sx, z: sz, angle: Math.PI, occupiedBy: null, cup: tableCup, chair };
     state.seats.push(seatObj);
     chair.traverse((o) => { if (o.isMesh) { o.userData.seat = seatObj; clickable.push(o); } });
     top.userData.seat = seatObj; clickable.push(top);
