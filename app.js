@@ -309,7 +309,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x14102b);
 scene.fog = new THREE.Fog(0x14102b, 45, 90);
 
-const camera = new THREE.PerspectiveCamera(IS_MOBILE && IS_PORTRAIT ? 78 : 62, innerWidth / innerHeight, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(IS_MOBILE && IS_PORTRAIT ? 68 : 55, innerWidth / innerHeight, 0.1, 200);
 camera.position.set(0, IS_MOBILE ? 12 : 15, IS_MOBILE ? 19 : 24);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -1436,7 +1436,7 @@ $('btn-cam').addEventListener('click', () => {
   state.camMode = (state.camMode + 1) % CAM_MODES.length;
   const m = CAM_MODES[state.camMode];
   if (m.pos) {
-    const pos = (state.camMode === 0 && IS_MOBILE) ? [0, 13, 22] : m.pos;
+    const pos = (state.camMode === 0 && IS_MOBILE) ? [0, 12, 19] : m.pos;
     camera.position.set(...pos); controls.target.set(...m.target);
   }
   toast('Góc nhìn: ' + m.label);
@@ -1468,7 +1468,7 @@ pvScene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.3));
 const pvDir = new THREE.DirectionalLight(0xffffff, 1.6);
 pvDir.position.set(3, 5, 4); pvScene.add(pvDir);
 const pvCam = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
-pvCam.position.set(0, 1.6, 5.0); pvCam.lookAt(0, 0.9, 0);
+pvCam.position.set(0, 1.6, 4.2); pvCam.lookAt(0, 0.9, 0);
 const pvDisc = new THREE.Mesh(new THREE.CircleGeometry(0.95, 28), new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.9 }));
 pvDisc.rotation.x = -Math.PI / 2; pvScene.add(pvDisc);
 let pvChar = null;
@@ -1537,8 +1537,8 @@ function enterCafe() {
   localStorage.setItem('cafe3d_name', name);
   localStorage.setItem('cafe3d_char', String(state.myChar));
   localStorage.setItem('cafe3d_outfit_' + state.myChar, state.myOutfit || CHARACTERS[state.myChar].outfitId);
-  camera.position.set(0, IS_MOBILE ? 11 : 12, IS_MOBILE ? 19 : 24);
-  controls.target.set(0, 1, 4);
+  camera.position.set(0, IS_MOBILE ? 8 : 9, IS_MOBILE ? 15 : 20);
+  controls.target.set(0, 1, 8);
   log(`<span class="sys">🎉 ${escapeHtml(name)} vừa vào quán! Có ${state.players.size} người đang ở đây.</span>`);
   joinFirebase();
   toast('Chào mừng đến quán! Bấm vào ghế trống để ngồi xuống ☕');
