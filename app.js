@@ -1747,7 +1747,13 @@ function animate() {
     _cc.set(c.group.position.x, c.group.position.y + 0.9, c.group.position.z).sub(camera.position);
     const distChar = _cc.length();
     const cos = _ct.normalize().dot(_cc.normalize());
-    const blocking = distChar < 6 && cos > 0.9 && distChar < distTarget - 1.5;
+    // Góc "Theo chân bạn" (camMode 1): camera khóa vào nhân vật của mình nên
+    // distChar ≈ distTarget, điều kiện distChar < distTarget - 1.5 không bao
+    // giờ đúng -> nhân vật của mình không bao giờ mờ. Bỏ giới hạn 6m: ở góc
+    // xem tivi camera cách tivi ~13,7m nên nhân vật đứng 7-10m trước tivi
+    // cũng phải mờ. Góc nhìn/FOV không đổi, chỉ đổi điều kiện mờ.
+    const isMeFollow = c.id === 'me' && state.camMode === 1;
+    const blocking = isMeFollow || (cos > 0.9 && distChar < distTarget - 1.5);
     const target = blocking ? 0.12 : 1;
     c._fade = (c._fade ?? 1) + (target - (c._fade ?? 1)) * Math.min(1, dt * 8);
     for (const m of c.mats) {
