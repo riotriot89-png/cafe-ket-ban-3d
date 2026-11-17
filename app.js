@@ -221,6 +221,8 @@ function joinFirebase() {
   publishMe(true);
 }
 let lastPublish = 0;
+let publishCount = 0; // đếm số lần gửi vị trí lên Firebase (để kiểm tra đồng bộ)
+window.__cafeNet = () => ({ fbReady, publishCount, lastPublish, entered: state.entered });
 function myStateData() {
   const me = state.players.get('me');
   return {
@@ -242,18 +244,23 @@ function myStateData() {
 function publishMe(now = false) {
   if (!fbReady || !state.entered || !myPlayerRef) return;
   const t = Date.now();
-  if (now || t - lastPublish >= 250) { lastPublish = t; myPlayerRef.set(myStateData()); }
+  if (now || t - lastPublish >= 250) { lastPublish = t; publishCount++; myPlayerRef.set(myStateData()); }
 }
 function listenPlayers() {
   const ref = fbDb.ref(`rooms/${ROOM}/players`);
   ref.once('value', () => { fbPlayersReady = true; });
-  ref.on('child_added', (snap) => {
+  ref.on('child_added', async (snap) => {
     const id = snap.key, d = snap.val();
     if (!d || id === myFbId) return;
     if (Date.now() - (d.at || 0) > 90000) { snap.ref.remove(); return; }
     if (state.players.has(id)) return;
     const base = CHARACTERS[d.char] || CHARACTERS[0];
     const spec = { ...base, outfitId: d.outfit || base.outfitId };
+    // Người kia là Jake/Miku (GLB) mà file GLB chưa tải xong thì CHỜ tải xong
+    // rồi mới spawn — trước đây spawn ngay nên rơi vào Milo tạm, rồi không bao
+    // giờ dựng lại, thành ra 1 máy thấy người kia là Milo / hoặc không thấy đúng.
+    if (spec.glb && !glbData[spec.glb]) await glbPromises[spec.glb];
+    if (state.players.has(id)) return;
     const c = spawnCharacter(id, d.name || 'Khách', spec, { x: d.x ?? 0, z: d.z ?? 15.5, rotY: d.rotY ?? 0 });
     c.isRemote = true;
     c.tx = d.x ?? 0; c.tz = d.z ?? 15.5; c.trotY = d.rotY ?? 0;
@@ -266,10 +273,12 @@ function listenPlayers() {
     if (Date.now() - (d.at || 0) > 90000) { snap.ref.remove(); return; }
     const c = state.players.get(id);
     if (!c) return;
-    // Người kia đổi nhân vật / trang phục -> dựng lại nhân vật cho họ
+    // Người kia đổi nhân vật / trang phục -> dựng lại nhân vật cho họ.
+    // Cả trường hợp trước đây spawn tạm bằng Milo vì GLB chưa tải xong
+    // (giờ GLB đã có mà c vẫn không phải GLB) thì cũng dựng lại cho đúng.
     const base = CHARACTERS[d.char] || CHARACTERS[0];
     const newOutfit = d.outfit || base.outfitId;
-    if (c.spec.name !== base.name || c.spec.outfitId !== newOutfit) {
+    if (c.spec.name !== base.name || c.spec.outfitId !== newOutfit || (base.glb && !c.isGLB && glbData[base.glb])) {
       removeCharacter(id);
       const spec = { ...base, outfitId: newOutfit };
       const nc = spawnCharacter(id, d.name || 'Khách', spec, { x: d.x ?? 0, z: d.z ?? 15.5, rotY: d.rotY ?? 0 });
@@ -2351,7 +2360,7 @@ function updateMyMovement() {
   if (keysDown.has('a') || keysDown.has('arrowleft')) rx -= 1;
   if (joyActive) { fz += -joyVec.y; rx += joyVec.x; }
   if (!fz && !rx) {
-    if (me.mode === 'free') { me.mode = 'idle'; me.moveDir = null; }
+    if (me.mode === 'free') { me.mode = 'idle'; me.moveDir = null; publishMe(true); /* gửi vị trí cuối ngay, khỏi chờ nhịp tim 15s */ }
     return;
   }
   // Đang ngồi mà bấm di chuyển thì đứng dậy rồi đi
@@ -2812,10 +2821,13 @@ function animate() {
       m.opacity = (m.baseOpacity ?? 1) * c._fade;
     }
   }
-  // Gửi vị trí của mình lên Firebase khi đang đi (giới hạn 4 lần/giây)
+  // Gửi vị trí của mình lên Firebase khi đang đi (giới hạn 4 lần/giây).
+  // BUG CŨ: chỉ publish khi mode === 'walk' (đi tự động tới ghế), còn đi tự do
+  // WASD/joystick là mode 'free' nên KHÔNG publish — vị trí chỉ gửi theo
+  // nhịp tim 15s, người khác thấy mình đứng yên/delay tới 15s, 2 máy không gặp nhau.
   if (state.entered) {
     const me = state.players.get('me');
-    if (me && me.mode === 'walk') publishMe();
+    if (me && (me.mode === 'walk' || me.mode === 'free')) publishMe();
   }
   tvTimer += dt;
   // Tên + bong bóng chat bám theo đầu nhân vật 3D (tên ở trên đầu, bong bóng ở trên tên)
