@@ -45,12 +45,22 @@ người này đi lại/chat thì người kia thấy ngay.
 
 ## Chơi trên điện thoại
 
-- Điện thoại tự bật chế độ nhẹ (tắt bóng đổ, giảm độ phân giải render) cho mượt,
-  camera tự lùi lại và mở rộng góc nhìn khi cầm dọc.
-- Thanh trên cùng gọn thành 2 hàng, các nút chỉ còn icon cho dễ bấm.
-- Chat thu gọn thành nút 💬 ở góc phải dưới, bấm mới mở để khỏi che màn hình.
+- **Game bắt xoay ngang**: cầm dọc thì hiện màn hình "Xoay ngang điện thoại để
+  chơi", vào quán là xin toàn màn hình + khóa xoay ngang (Android) như game thật.
+- Màn chào ở chế độ ngang chia 2 cột (nhân vật bên trái, tên + nút vào quán bên
+  phải) để vừa màn hình ngắn; topbar 1 hàng chỉ còn icon; chat thu gọn thành
+  nút 💬 ở góc phải dưới, bấm mới mở để khỏi che màn hình.
+- Điện thoại tự bật chế độ nhẹ (tắt bóng đổ, giảm độ phân giải render) cho mượt.
 - Chạm 1 ngón để xoay quán, chụm 2 ngón để zoom, chạm vào bàn/ghế để ngồi.
   Khi xoay quán thì chạm được lệch nhiều hơn để khỏi bấm nhầm ghế.
+
+## Cài đặt như game thật (PWA)
+
+- Quán là PWA: có `manifest.json` + service worker, mở bằng Chrome/Android thì
+  nút "📲 Cài đặt game" ở màn chào sẽ hiện ra; iPhone thì bấm Chia sẻ ⤴️ rồi
+  chọn "Thêm vào Màn hình chính". Sau khi cài, game mở toàn màn hình, có icon
+  riêng trên màn hình chính, khóa xoay ngang và chạy được cả khi mất mạng
+  (bản đã lưu trong bộ nhớ đệm).
 
 Lưu ý: database đang ở **test mode** (mở toàn quyền đọc/ghi, hết hạn sau 30 ngày kể
 từ lúc tạo). Trước khi hết hạn, vào Firebase Console → Realtime Database → Rules

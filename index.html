@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#150d2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Café Kết Bạn">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Café Kết Bạn 3D — Quán cà phê kết bạn</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
 <link rel="stylesheet" href="style.css">
@@ -78,18 +85,33 @@
   <div class="welcome-card">
     <h1>☕ Café Kết Bạn <span class="tag3d">3D</span></h1>
     <p class="welcome-sub">Quán cà phê 3D cho 100 người — chọn nhân vật, vào quán, ngồi xuống và làm quen!</p>
-    <label class="field-label">Tên của bạn</label>
-    <div class="name-row">
-      <input id="player-name" type="text" maxlength="20" placeholder="Nhập tên của bạn...">
-      <button id="btn-random">🎲 Ngẫu nhiên</button>
+    <div class="welcome-main">
+      <div class="welcome-char">
+        <label class="field-label">Chọn nhân vật 3D</label>
+        <div id="char-preview-wrap"><canvas id="char-preview" width="280" height="280"></canvas></div>
+        <div id="char-grid"></div>
+        <label class="field-label">Chọn trang phục</label>
+        <div id="outfit-grid"></div>
+      </div>
+      <div class="welcome-form">
+        <label class="field-label">Tên của bạn</label>
+        <div class="name-row">
+          <input id="player-name" type="text" maxlength="20" placeholder="Nhập tên của bạn...">
+          <button id="btn-random">🎲 Ngẫu nhiên</button>
+        </div>
+        <button id="btn-enter">Vào quán →</button>
+        <button id="btn-install" class="hidden">📲 Cài đặt game</button>
+        <p class="welcome-note">Chưa cần đăng nhập • Quán có 100 ghế: sảnh chính, sân vườn, lounge</p>
+      </div>
     </div>
-    <label class="field-label">Chọn nhân vật 3D</label>
-    <div id="char-preview-wrap"><canvas id="char-preview" width="280" height="280"></canvas></div>
-    <div id="char-grid"></div>
-    <label class="field-label">Chọn trang phục</label>
-    <div id="outfit-grid"></div>
-    <button id="btn-enter">Vào quán →</button>
-    <p class="welcome-note">Chưa cần đăng nhập • Quán có 100 ghế: sảnh chính, sân vườn, lounge</p>
+  </div>
+</div>
+
+<div id="rotate-overlay" class="hidden">
+  <div class="rotate-box">
+    <div class="rotate-phone">📱</div>
+    <h2>Xoay ngang điện thoại để chơi</h2>
+    <p>Game chơi tốt nhất ở màn hình ngang</p>
   </div>
 </div>
 

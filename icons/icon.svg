@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6d28d9"/>
+      <stop offset="1" stop-color="#db2777"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Hơi nóng -->
+  <path d="M214 190 C 204 170, 224 160, 214 140 C 204 120, 224 110, 214 95" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" opacity="0.9"/>
+  <path d="M298 190 C 288 170, 308 160, 298 140 C 288 120, 308 110, 298 95" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" opacity="0.9"/>
+  <!-- Tay cầm -->
+  <ellipse cx="356" cy="287" rx="34" ry="40" fill="none" stroke="#fff" stroke-width="15"/>
+  <!-- Thân ly -->
+  <rect x="170" y="210" width="172" height="154" rx="24" fill="#fff"/>
+  <!-- Đĩa lót -->
+  <ellipse cx="256" cy="396" rx="124" ry="20" fill="#fff" opacity="0.85"/>
+  <!-- Trái tim hồng -->
+  <path d="M256 322 C 244 308, 224 296, 224 280 C 224 268, 234 260, 244 260 C 250 260, 254 264, 256 268 C 258 264, 262 260, 268 260 C 278 260, 288 268, 288 280 C 288 296, 268 308, 256 322 Z" fill="#db2777"/>
+</svg>

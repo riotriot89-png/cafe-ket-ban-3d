@@ -1314,7 +1314,7 @@ function sendChat() {
 $('chat-send').addEventListener('click', sendChat);
 $('chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
 /* Điện thoại: chat thu gọn thành nút 💬 nổi, bấm mới mở để khỏi che màn hình */
-if (matchMedia('(max-width: 640px)').matches) $('chat-panel').classList.add('mobile-hidden');
+if (IS_MOBILE) $('chat-panel').classList.add('mobile-hidden');
 $('btn-chat-toggle').addEventListener('click', () => {
   const p = $('chat-panel');
   p.classList.toggle('mobile-hidden');
@@ -1444,7 +1444,7 @@ $('btn-cam').addEventListener('click', () => {
   state.camMode = (state.camMode + 1) % CAM_MODES.length;
   const m = CAM_MODES[state.camMode];
   if (m.pos) {
-    const pos = (state.camMode === 0 && IS_MOBILE) ? [0, 12, 19] : m.pos;
+    const pos = (state.camMode === 0 && IS_MOBILE) ? (isPortraitPhone() ? [0, 12, 19] : [0, 13, 22]) : m.pos;
     camera.position.set(...pos); controls.target.set(...m.target);
   }
   toast('Góc nhìn: ' + m.label);
@@ -1545,7 +1545,9 @@ function enterCafe() {
   localStorage.setItem('cafe3d_name', name);
   localStorage.setItem('cafe3d_char', String(state.myChar));
   localStorage.setItem('cafe3d_outfit_' + state.myChar, state.myOutfit || CHARACTERS[state.myChar].outfitId);
-  camera.position.set(0, IS_MOBILE ? 8 : 9, IS_MOBILE ? 15 : 20);
+  // Điện thoại xoay ngang: camera lùi ra cao hơn một chút để thấy trọn quán
+  const enterPos = IS_MOBILE ? (isPortraitPhone() ? [0, 8, 15] : [0, 10, 19]) : [0, 9, 20];
+  camera.position.set(...enterPos);
   controls.target.set(0, 1, 8);
   log(`<span class="sys">🎉 ${escapeHtml(name)} vừa vào quán! Có ${state.players.size} người đang ở đây.</span>`);
   joinFirebase();
@@ -1555,6 +1557,13 @@ function enterCafe() {
   // sẽ bị chặn rồi thanh trượt hiển thị sai là đang có tiếng.
   applyVolume();
   setTimeout(syncVolumeUI, 800);
+  // Điện thoại: vào quán là xin toàn màn hình + khóa xoay ngang như game thật
+  // (Android cho khóa khi đang toàn màn hình; iPhone dùng màn hình nhắc xoay).
+  if (IS_MOBILE && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().then(() => {
+      if (screen.orientation?.lock) screen.orientation.lock('landscape').catch(() => {});
+    }).catch(() => {});
+  }
 }
 $('btn-enter').addEventListener('click', enterCafe);
 $('player-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') enterCafe(); });
@@ -1731,10 +1740,46 @@ window.__cafeFps = () => new Promise((res) => {
   requestAnimationFrame(tick);
 });
 
-addEventListener('resize', () => {
+/* ---- Ép xoay ngang trên điện thoại: hiện màn hình nhắc xoay khi cầm dọc ---- */
+function isPortraitPhone() { return IS_MOBILE && innerHeight > innerWidth; }
+function checkOrientation() {
+  $('rotate-overlay').classList.toggle('hidden', !isPortraitPhone());
+  // Cập nhật góc nhìn theo hướng màn hình hiện tại (dọc 68 / ngang 55)
+  camera.fov = IS_MOBILE ? (isPortraitPhone() ? 68 : 55) : 55;
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   cssRenderer.setSize(innerWidth, innerHeight);
-  if (innerWidth > 640) $('chat-panel').classList.remove('mobile-hidden');
+}
+addEventListener('orientationchange', () => setTimeout(checkOrientation, 300));
+
+/* ---- Cài đặt game (PWA): nút "Cài đặt game" ở màn chào ---- */
+let deferredInstall = null;
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  $('btn-install').classList.remove('hidden');
 });
+$('btn-install').addEventListener('click', async () => {
+  if (deferredInstall) {
+    deferredInstall.prompt();
+    await deferredInstall.userChoice;
+    deferredInstall = null;
+    $('btn-install').classList.add('hidden');
+  } else if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    toast('iPhone: bấm nút Chia sẻ ⤴️ rồi chọn "Thêm vào Màn hình chính"');
+  } else {
+    toast('Mở menu trình duyệt rồi chọn "Thêm vào Màn hình chính"');
+  }
+});
+// iOS không có beforeinstallprompt nên hiện nút luôn để hướng dẫn cách cài
+if (/iPhone|iPad|iPod/.test(navigator.userAgent)) $('btn-install').classList.remove('hidden');
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+addEventListener('resize', () => {
+  checkOrientation();
+  if (!IS_MOBILE) $('chat-panel').classList.remove('mobile-hidden');
+});
+checkOrientation();
