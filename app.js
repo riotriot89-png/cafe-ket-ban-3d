@@ -244,7 +244,11 @@ function myStateData() {
 function publishMe(now = false) {
   if (!fbReady || !state.entered || !myPlayerRef) return;
   const t = Date.now();
-  if (now || t - lastPublish >= 250) { lastPublish = t; publishCount++; myPlayerRef.set(myStateData()); }
+  // Realtime: gửi vị trí tối đa 10 lần/giây khi đang đi (trước đây 4 lần/giây).
+  // Gửi từng khung hình (60 lần/giây) thì Firebase + điện thoại của 100 người
+  // không chịu nổi, còn 10 lần/giây + trượt mượt ở máy người nhận là đủ
+  // nhìn như realtime rồi.
+  if (now || t - lastPublish >= 100) { lastPublish = t; publishCount++; myPlayerRef.set(myStateData()); }
 }
 function listenPlayers() {
   const ref = fbDb.ref(`rooms/${ROOM}/players`);
@@ -2073,7 +2077,7 @@ function updateCharacter(c, dt, t) {
     const dz = (c.tz ?? c.group.position.z) - c.group.position.z;
     const dist = Math.hypot(dx, dz);
     if (dist > 0.12) {
-      const step = Math.min(dist, c.speed * dt * 1.6);
+      const step = Math.min(dist, c.speed * dt * 2.4); // trượt nhanh hơn để đuổi kịp vị trí thật (trước 1.6x)
       c.group.position.x += (dx / dist) * step;
       c.group.position.z += (dz / dist) * step;
       const targetRot = Math.atan2(dx, dz);
@@ -2342,6 +2346,7 @@ function standUp(c) {
 // Hướng di chuyển theo camera (WASD/joystick): W = xa camera, S = về phía camera
 const keysDown = new Set();
 let joyActive = false, joyVec = { x: 0, y: 0 };
+let _lastMoveDir = null; // hướng đi lần trước — đổi hướng thì gửi ngay, khỏi chờ 100ms
 function camForward() {
   const f = new THREE.Vector3();
   camera.getWorldDirection(f);
@@ -2360,7 +2365,7 @@ function updateMyMovement() {
   if (keysDown.has('a') || keysDown.has('arrowleft')) rx -= 1;
   if (joyActive) { fz += -joyVec.y; rx += joyVec.x; }
   if (!fz && !rx) {
-    if (me.mode === 'free') { me.mode = 'idle'; me.moveDir = null; publishMe(true); /* gửi vị trí cuối ngay, khỏi chờ nhịp tim 15s */ }
+    if (me.mode === 'free') { me.mode = 'idle'; me.moveDir = null; _lastMoveDir = null; publishMe(true); /* gửi vị trí cuối ngay, khỏi chờ nhịp tim 15s */ }
     return;
   }
   // Đang ngồi mà bấm di chuyển thì đứng dậy rồi đi
@@ -2371,6 +2376,10 @@ function updateMyMovement() {
   dir.y = 0;
   if (dir.lengthSq() < 0.001) return;
   dir.normalize();
+  // Đổi hướng đột ngột (quay đầu, rẽ) thì gửi ngay để máy kia thấy mình quay
+  // đầu liền, không phải chờ tới lượt gửi 100ms sau.
+  if (!_lastMoveDir || (_lastMoveDir.x * dir.x + _lastMoveDir.z * dir.z) < 0.85) publishMe(true);
+  _lastMoveDir = { x: dir.x, z: dir.z };
   me.moveDir = { x: dir.x, z: dir.z };
   me.mode = 'free';
   me.path = []; me.pendingSeat = null;
