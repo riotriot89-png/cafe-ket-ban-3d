@@ -2128,7 +2128,9 @@ function updateCharacter(c, dt, t) {
     let dr = targetRot - c.group.rotation.y;
     while (dr > Math.PI) dr -= Math.PI * 2;
     while (dr < -Math.PI) dr += Math.PI * 2;
-    c.group.rotation.y += dr * Math.min(1, dt * 8);
+    const dRot = dr * Math.min(1, dt * 8);
+    c.group.rotation.y += dRot;
+    if (c.id === 'me' && state.camMode === 3) state.fpYaw -= dRot; // góc thứ nhất: người quay bao nhiêu trừ bấy nhiêu khỏi góc nhìn, khỏi vòng lặp xoay (xem nhánh 'free')
     if (dist <= step) {
       c.group.position.x = target.x; c.group.position.z = target.z;
       c.path.shift();
@@ -2159,7 +2161,15 @@ function updateCharacter(c, dt, t) {
     let dr = targetRot - c.group.rotation.y;
     while (dr > Math.PI) dr -= Math.PI * 2;
     while (dr < -Math.PI) dr += Math.PI * 2;
-    c.group.rotation.y += dr * Math.min(1, dt * 8);
+    const dRot = dr * Math.min(1, dt * 8);
+    c.group.rotation.y += dRot;
+    // SỬA XOAY VÒNG Ở GÓC NHÌN THỨ NHẤT: hướng đi tính theo camera, mà
+    // camera ở góc này bám theo hướng người (yaw = rotY + fpYaw). Không trừ
+    // bù thì: người quay theo hướng đi -> camera quay theo người -> hướng đi
+    // lại đổi theo camera -> người quay tiếp, xoay vòng vòng chóng mặt.
+    // Trừ đúng số người vừa quay khỏi fpYaw thì hướng nhìn đứng yên, người
+    // quay tới đúng hướng đang nhìn rồi đi thẳng, fpYaw về 0.
+    if (c.id === 'me' && state.camMode === 3) state.fpYaw -= dRot;
     c.walkPhase += dt * 9;
     const s = Math.sin(c.walkPhase);
     pt.thighL = s * 0.55; pt.thighR = -s * 0.55;
@@ -2372,6 +2382,9 @@ function updateMyMovement() {
   }
   // Đang ngồi mà bấm di chuyển thì đứng dậy rồi đi
   if (me.mode === 'sit') standUp(me);
+  // Hướng đi tính theo hướng camera. Ở góc nhìn thứ nhất, vòng lặp xoay
+  // được chặn ở updateCharacter: người quay bao nhiêu thì fpYaw trừ bấy
+  // nhiêu, nên hướng nhìn (và hướng đi) không tự đổi theo người nữa.
   const f = camForward();
   const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0));
   const dir = new THREE.Vector3().addScaledVector(f, fz).addScaledVector(r, rx);

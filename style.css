@@ -92,7 +92,7 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family:
 #btn-chat-toggle { display: none; position: fixed; right: 14px; bottom: 14px; z-index: 25; width: 52px; height: 52px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff; font-size: 24px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.5); align-items: center; justify-content: center; }
 
 /* Joystick di chuyển (điện thoại): đế tròn + nút kéo, góc trái dưới */
-#joystick { position: fixed; left: 18px; bottom: 96px; z-index: 25; width: 120px; height: 120px; border-radius: 50%; background: rgba(12,8,28,.45); border: 2px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); touch-action: none; }
+#joystick { position: fixed; left: 18px; bottom: 28px; z-index: 25; width: 120px; height: 120px; border-radius: 50%; background: rgba(12,8,28,.45); border: 2px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); touch-action: none; }
 #joy-knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #db2777); border: 2px solid rgba(255,255,255,.6); box-shadow: 0 4px 16px rgba(0,0,0,.5); transform: translate(-50%, -50%); pointer-events: none; }
 /* Nút Ngồi / Đứng dậy: hiện khi lại gần ghế trống hoặc đang ngồi */
 #btn-sit { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 25; padding: 12px 26px; border-radius: 28px; border: 1px solid rgba(255,255,255,.4); background: linear-gradient(135deg, #059669, #10b981); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
