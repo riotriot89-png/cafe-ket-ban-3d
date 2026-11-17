@@ -147,7 +147,7 @@ const state = {
   seats: [],          // {id, table, zone, x, z, angle, occupiedBy, cup}
   friends: new Set(JSON.parse(localStorage.getItem('cafe3d_friends') || '[]')),
   videoId: 'jfKfPfyJRdk', videoTitle: 'Lofi Girl — beats to relax/study to',
-  camMode: 0, // 0 toàn cảnh, 1 theo mình, 2 tivi, 3 góc nhìn thứ nhất
+  camMode: 1, // mặc định THEO CHÂN bạn (0 toàn cảnh, 1 theo mình, 2 tivi, 3 góc nhìn thứ nhất)
   fpYaw: 0, fpPitch: 0, // góc nhìn thứ nhất: lệch hướng nhìn khi kéo chuột/chạm
 };
 const $ = (id) => document.getElementById(id);
@@ -378,7 +378,7 @@ const scene = new THREE.Scene();
 scene.background = null; // nền trong suốt để lớp tivi (CSS3D, nằm dưới canvas WebGL) hiện qua lỗ màn hình
 scene.fog = new THREE.Fog(0x14102b, 45, 90);
 
-const camera = new THREE.PerspectiveCamera(IS_MOBILE && IS_PORTRAIT ? 68 : 55, innerWidth / innerHeight, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(IS_MOBILE && IS_PORTRAIT ? 68 : 62, innerWidth / innerHeight, 0.1, 200); // FOV 62 (trước 55) để thấy rộng xung quanh hơn
 camera.position.set(0, IS_MOBILE ? 12 : 15, IS_MOBILE ? 19 : 24);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setClearColor(0x000000, 0); // canvas trong suốt: tivi nằm dưới vẫn hiện qua lỗ màn hình
@@ -408,10 +408,12 @@ controls.target.set(0, 1, 2);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 5;
-controls.maxDistance = 38;
+controls.maxDistance = 45; // kéo xa ra được nhiều hơn để thấy rộng xung quanh
 controls.maxPolarAngle = 1.48;
-controls.minAzimuthAngle = -1.35;
-controls.maxAzimuthAngle = 1.35;
+// KHÔNG giới hạn góc xoay ngang nữa (trước đây kẹp ±1.35 rad nên xoay tới
+// ~77° là kẹt cứng, không xoay vòng 360° được) — giờ xoay thoải mái.
+controls.minAzimuthAngle = -Infinity;
+controls.maxAzimuthAngle = Infinity;
 controls.update();
 
 // Renderer CSS3D: chiếu video YouTube thật lên màn hình tivi trong game.
@@ -2688,10 +2690,12 @@ async function enterCafe() {
   localStorage.setItem('cafe3d_name', name);
   localStorage.setItem('cafe3d_char', String(state.myChar));
   localStorage.setItem('cafe3d_outfit_' + state.myChar, state.myOutfit || CHARACTERS[state.myChar].outfitId);
-  // Điện thoại xoay ngang: camera lùi ra cao hơn một chút để thấy trọn quán
-  const enterPos = IS_MOBILE ? (isPortraitPhone() ? [0, 8, 15] : [0, 10, 19]) : [0, 9, 20];
+  // Vào quán là camera THEO CHÂN bạn, lùi ra xa + thấp hơn một chút để thấy
+  // rộng xung quanh (trước đây góc toàn cảnh cố định ở (0,9,20) nhìn về (0,1,8)).
+  state.camMode = 1;
+  const enterPos = IS_MOBILE ? (isPortraitPhone() ? [0, 8, 17] : [0, 9, 21]) : [0, 8, 22];
   camera.position.set(...enterPos);
-  controls.target.set(0, 1, 8);
+  controls.target.set(0, 1.3, 15.5); // khóa vào nhân vật của mình ngay từ đầu
   log(`<span class="sys">🎉 ${escapeHtml(name)} vừa vào quán! Có ${state.players.size} người đang ở đây.</span>`);
   joinFirebase();
   toast('Chào mừng đến quán! Bấm vào ghế trống để ngồi xuống ☕');
@@ -2966,8 +2970,8 @@ window.__cafeFps = () => new Promise((res) => {
 function isPortraitPhone() { return IS_MOBILE && innerHeight > innerWidth; }
 function checkOrientation() {
   $('rotate-overlay').classList.toggle('hidden', !isPortraitPhone());
-  // Cập nhật góc nhìn theo hướng màn hình hiện tại (dọc 68 / ngang 55)
-  camera.fov = IS_MOBILE ? (isPortraitPhone() ? 68 : 55) : 55;
+  // Cập nhật góc nhìn theo hướng màn hình hiện tại (dọc 68 / ngang và máy tính 62)
+  camera.fov = IS_MOBILE ? (isPortraitPhone() ? 68 : 62) : 62;
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
