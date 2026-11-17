@@ -2708,7 +2708,7 @@ async function enterCafe() {
   state.camMode = 1;
   const enterPos = IS_MOBILE ? (isPortraitPhone() ? [0, 8, 17] : [0, 9, 21]) : [0, 8, 22];
   camera.position.set(...enterPos);
-  controls.target.set(0, 1.3, 15.5); // khóa vào nhân vật của mình ngay từ đầu
+  controls.target.set(0, 1.3, 13); // điểm nhìn trước mặt nhân vật (nhân vật ở (0,15.5)), để người hiện ở nửa dưới màn hình ngay từ đầu
   log(`<span class="sys">🎉 ${escapeHtml(name)} vừa vào quán! Có ${state.players.size} người đang ở đây.</span>`);
   joinFirebase();
   toast('Chào mừng đến quán! Bấm vào ghế trống để ngồi xuống ☕');
@@ -2833,13 +2833,13 @@ function animate() {
     _cc.set(c.group.position.x, c.group.position.y + 0.9, c.group.position.z).sub(camera.position);
     const distChar = _cc.length();
     const cos = _ct.normalize().dot(_cc.normalize());
-    // Góc "Theo chân bạn" (camMode 1): camera khóa vào nhân vật của mình nên
-    // distChar ≈ distTarget, điều kiện distChar < distTarget - 1.5 không bao
-    // giờ đúng -> nhân vật của mình không bao giờ mờ. Bỏ giới hạn 6m: ở góc
-    // xem tivi camera cách tivi ~13,7m nên nhân vật đứng 7-10m trước tivi
-    // cũng phải mờ. Góc nhìn/FOV không đổi, chỉ đổi điều kiện mờ.
-    const isMeFollow = c.id === 'me' && state.camMode === 1;
-    const blocking = isMeFollow || (cos > 0.9 && distChar < distTarget - 1.5);
+    // Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì mờ đi.
+    // RIÊNG nhân vật của mình ở góc theo chân thì KHÔNG bao giờ mờ nữa:
+    // trước đây ép mờ 0.12 nên vào quán là mình tàng hình luôn (chỉ còn
+    // bóng mờ + tên). Giờ điểm nhìn đã dời ra trước mặt (xem nhánh theo chân
+    // bên dưới) nên nhân vật hiện ở nửa dưới màn hình, thấy rõ người mà
+    // không che tivi — không cần mờ. Các góc khác vẫn mờ theo hình học như cũ.
+    const blocking = (c.id === 'me' && state.camMode === 1) ? false : (cos > 0.9 && distChar < distTarget - 1.5);
     const target = blocking ? 0.12 : 1;
     c._fade = (c._fade ?? 1) + (target - (c._fade ?? 1)) * Math.min(1, dt * 8);
     for (const m of c.mats) {
@@ -2905,11 +2905,17 @@ function animate() {
     // Đặt target ảo phía trước để tính mờ nhân vật che tầm nhìn cho đúng
     controls.target.set(_pv.x + Math.sin(yaw) * cp * 8, _pv.y + 0.05 + sp * 8, _pv.z + Math.cos(yaw) * cp * 8);
   } else {
-    // Camera theo chân người chơi
+    // Camera theo chân người chơi: điểm nhìn đặt TRƯỚC MẶT nhân vật ~2.5m
+    // (theo hướng camera đang nhìn) thay vì khóa đúng vào người — để nhân
+    // vật hiện ở nửa dưới màn hình, thấy rõ người mà không che tivi/phía trước.
     if (state.camMode === 1) {
       const me2 = state.players.get('me');
       if (me2) {
-        _pv.set(me2.group.position.x, 1.3, me2.group.position.z);
+        const fwd = new THREE.Vector3();
+        camera.getWorldDirection(fwd); fwd.y = 0;
+        if (fwd.lengthSq() < 0.001) fwd.set(0, 0, -1);
+        fwd.normalize();
+        _pv.set(me2.group.position.x + fwd.x * 2.5, 1.3, me2.group.position.z + fwd.z * 2.5);
         const dx = (_pv.x - controls.target.x) * 0.07;
         const dy = (_pv.y - controls.target.y) * 0.07;
         const dz = (_pv.z - controls.target.z) * 0.07;
