@@ -37,14 +37,22 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   Màn chọn nhân vật có xem trước 3D xoay vòng. Trang phục được tách thành bảng dữ
   liệu `OUTFITS` trong app.js: thêm bộ đồ mới cho người chơi mua chỉ cần thêm 1 entry,
   không phải sửa code dựng nhân vật.
-- **Đồ họa (thiết kế lại 2026-11-17)**: không còn màu phẳng + khối vuông. Ánh sáng điện
-  ảnh (tone mapping ACES + environment RoomEnvironment qua PMREM) cho vật liệu có phản
-  xạ thật; texture vẽ bằng canvas — sàn gỗ có vân + mắt gỗ, tường thạch cao, tường gạch
-  sau quầy bar, mặt quầy đá cẩm thạch, sofa vải dệt, thảm hoa văn, mặt bàn vân gỗ tỏa
-  tròn, sân vườn lát đá. Nội thất tiện bằng lathe (chân bàn đế loe thân thon, chao đèn
-  chuông, chậu cây, chai lọ) và ghế lưng cong ôm lưng + đệm vải bo tròn + chân thon xòe,
-  sofa đệm bo tròn, quầy bar có kệ chai + máy pha espresso. Bóng mặt trời thật
-  (PCFSoft, bias/normalBias/radius đã chỉnh) + bóng mềm dưới chân nhân vật.
+- **Đồ họa (thiết kế lại 2026-11-17, nâng cấp lần 2 cùng ngày)**: không còn màu phẳng +
+  khối vuông. Ánh sáng điện ảnh (tone mapping ACES + environment RoomEnvironment qua
+  PMREM) cho vật liệu có phản xạ thật; **texture ảnh thật** (vendor/textures.js, base64
+  512px: sàn gỗ sồi, tường gạch, đá cẩm thạch, cỏ sân vườn) thay cho texture vẽ tay ở
+  các bề mặt lớn; texture vẽ bằng canvas cho tường thạch cao, sofa vải dệt, thảm hoa
+  văn, mặt bàn vân gỗ tỏa tròn. Nội thất tiện bằng lathe (chân bàn đế loe thân thon,
+  chao đèn chuông, chậu cây, chai lọ) và ghế lưng cong ôm lưng + đệm vải bo tròn + chân
+  thon xòe, sofa đệm bo tròn, quầy bar có kệ chai + máy pha espresso. Bóng mặt trời
+  thật (PCFSoft, bias/normalBias/radius đã chỉnh) + bóng mềm dưới chân nhân vật +
+  bóng tiếp xúc dưới mỗi bàn. **Quán hoàn thiện**: trần gỗ + dầm, cửa sổ 2 bên có bầu
+  trời thành phố + rèm vải, tranh treo tường + đồng hồ, chân tường, sân vườn có luống
+  hoa + hàng rào cây, bàn nào cũng có đĩa + bình hoa mini. **Nhân vật**: da có độ bóng
+  nhẹ (clearcoat), cổ, môi hồng, tay có ngón cái, tóc nhiều lớp có độ phồng + lọn mái,
+  quần áo có dây rút/khuy/khóa kéo/gấu áo. **Không khí**: chùm sáng ấm dưới đèn treo,
+  bụi bay lơ lửng, viền tối điện ảnh (vignette). Trần tự ẩn khi camera ở trên cao
+  (góc toàn cảnh) để khỏi che tầm nhìn.
 - **Tủ đồ (8 bộ)**: mỗi nhân vật có 4 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy
   qua Firebase. Milo: Street, Denim (áo khoác jean + quần jean + tóc ngắn), Thể thao
   (băng đô + tóc xoăn + áo cam + quần đùi), Mùa đông (mũ len + áo len cổ lọ + bốt).
