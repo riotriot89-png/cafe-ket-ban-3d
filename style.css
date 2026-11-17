@@ -71,7 +71,7 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family:
 #btn-random { border: none; background: rgba(255,255,255,.14); color: #fff; padding: 0 16px; border-radius: 12px; font-size: 14px; cursor: pointer; }
 #char-preview-wrap { display: flex; justify-content: center; }
 #char-preview { width: 240px; height: 240px; border-radius: 18px; background: radial-gradient(circle at 50% 35%, #3b2a6b, #150d2e); border: 1px solid rgba(255,255,255,.2); }
-#char-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+#char-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
 .char-card { border: 2px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #fff; border-radius: 12px; padding: 9px 4px; cursor: pointer; font-size: 13.5px; }
 .char-card b { display: block; font-size: 14.5px; }
 .char-card small { color: rgba(255,255,255,.7); }
@@ -110,7 +110,7 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family:
   .welcome-card h1 { font-size: 26px; }
   .welcome-sub { font-size: 13.5px; }
   #char-preview { width: 200px; height: 200px; }
-  #char-grid { grid-template-columns: repeat(4, 1fr); }
+  #char-grid { grid-template-columns: repeat(2, 1fr); }
   .char-card { font-size: 12.5px; padding: 8px 2px; }
   .char-card b { font-size: 13.5px; }
   #btn-random { flex-shrink: 0; padding: 0 10px; font-size: 13px; }
