@@ -21,7 +21,7 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   canvas static); (2) lỗ màn hình phải có `renderOrder = -1` để được vẽ trước tường
   (opaque sort theo material trước rồi mới theo độ sâu, nên tường vẽ trước sẽ làm
   lỗ không xóa được màu tường).
-- **Nhân vật 3D phong cách anime Genshin, cao ~1,85**: chỉ 2 nhân vật — **Milo (nam)**: bộ Street
+- **Nhân vật 3D phong cách anime Genshin, cao ~1,85** (đã thay bằng Jake/Miku bên dưới — code dựng procedural vẫn còn trong file nhưng không còn lựa chọn nào dùng): **Milo (nam)**: bộ Street
   (snapback đen vành đỏ có logo, hoodie kem túi kangaroo đỏ, quần cargo rêu có túi hộp,
   giày sneaker trắng đế đỏ); **Luna (nữ)**: bộ Chic (mũ beret hồng, nơ hồng, tóc dài mái ngang,
   áo trắng cổ bèo, váy xòe hồng 2 lớp có thắt lưng, túi xách chéo vàng, tất trắng dài, giày búp bê).
@@ -42,17 +42,27 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   Màn chọn nhân vật có xem trước 3D xoay vòng. Trang phục được tách thành bảng dữ
   liệu `OUTFITS` trong app.js: thêm bộ đồ mới cho người chơi mua chỉ cần thêm 1 entry,
   không phải sửa code dựng nhân vật.
-- **Nhân vật Chibi 3D thật (file `Chibi_Base_Mesh.blend` người dùng gửi)**: thêm lựa chọn
-  thứ 3 ở màn chào — **Chibi**, dùng đúng thân mesh người dùng gửi (đầu to, thân nhỏ,
-  1.954 đỉnh), không phải dựng bằng khối cơ bản. Mesh đã được rig sẵn 20 xương +
-  4 animation làm thêm trong Blender (thở Idle, đi bộ Walk, ngồi Sit, uống Drink)
-  rồi xuất GLB (`vendor/chibi-base-mesh.glb`, 457 KB) tải bằng GLTFLoader +
+- **Nhân vật Jake + Miku — model GLB thật tải trên mạng (thay hẳn Milo/Luna/Chibi)**:
+  chỉ 2 nhân vật trong quán. **Jake (nam)**: file Meshy AI "Desolate City Survivor"
+  (áo da nâu, mặt nạ phòng độc đeo cổ, gậy bóng chày sau lưng — dính liền mesh, không
+  gỡ được). **Miku (nữ)**: file Meshy AI "Cat Girl Miku" (tóc trắng, tai mèo, áo hồng
+  dấu chân mèo, quần short hồng, đuôi dài — dính liền mesh). Cả 2 đều cao 1,70m,
+  1 mesh liền duy nhất (~20,5k tris), 24 xương (tên xương 2 người giống hệt nhau),
+  1 texture atlas (đã hạ 4K -> 2K trong Blender), mặt hướng +Z. Mỗi file GLB đã gộp
+  sẵn 2 clip animation thật: Idle (14s) + Walk (~1s), tải bằng GLTFLoader +
   SkeletonUtils.clone (mỗi người chơi 1 bản clone + 1 AnimationMixer riêng, chuyển
-  animation bằng fade 0,25s; Sit/Drink giữ tư thế cuối, Idle/Walk lặp). Mặt (mắt to
-  có điểm sáng + miệng) và tóc nâu đội đầu gắn theo xương Head nên cử động theo đầu;
-  ly cà phê gắn vào tay phải, hiện khi uống. Chibi cao ~1,85 như Milo/Luna (scale 0,7),
-  tên/bong bóng chat bám theo xương đầu, ngồi quay mặt về tivi như nhân vật thường.
-  Milo/Luna (Genshin + 10 bộ đồ) vẫn giữ nguyên để chọn.
+  clip bằng fade 0,25s). File cuối: `vendor/jake.glb` (7,7 MB), `vendor/miku.glb`
+  (6,4 MB) — **file nhị phân, push-files không đẩy được, phải tải lên GitHub bằng
+  trình duyệt** (như file Chibi trước đây). Ngồi/Uống không có clip sẵn nên làm bằng
+  code: sau `mixer.update()` sẽ slerp xương về tư thế mục tiêu (đùi rotateX -1,5,
+  cẳng +1,45, hông hạ ~0,47m vừa tầm ghế; tay uống theo đúng keyframe của quán:
+  vai -1,30 / khuỷu -1,55 đưa ly lên miệng, đầu ngửa nhẹ) — góc đo bằng ảnh test thật.
+  Không làm clip Sit/Drink trong Blender vì tail xương Meshy bị rác (hướng tail vô
+  nghĩa) nên trục xoay đoán không ra. Ly cà phê gắn vào xương tay phải, tên/bong bóng
+  chat bám theo xương Head, góc nhìn thứ nhất ẩn cả người (mesh liền không tách đầu).
+  Quần áo dính liền trong file GLB (1 mesh + 1 atlas) nên không tách riêng được như hệ
+  OUTFITS cũ — muốn đổi đồ chỉ có cách vẽ lại texture hoặc model đồ mới đè lên trong
+  Blender; màn chào chỉ còn 1 bộ "Mặc định" và đã ẩn hẳn phần chọn trang phục.
 - **Đồ họa (thiết kế lại 2026-11-17, nâng cấp lần 2 cùng ngày)**: không còn màu phẳng +
   khối vuông. Ánh sáng điện ảnh (tone mapping ACES + environment RoomEnvironment qua
   PMREM) cho vật liệu có phản xạ thật; **texture ảnh thật** (vendor/textures.js, base64
@@ -69,7 +79,8 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   gradient có tia hướng tâm, tóc nhiều lớp có highlight, váy 2 lớp. **Không khí**: chùm sáng ấm dưới đèn treo,
   bụi bay lơ lửng, viền tối điện ảnh (vignette). Trần tự ẩn khi camera ở trên cao
   (góc toàn cảnh) để khỏi che tầm nhìn.
-- **Tủ đồ (10 bộ)**: mỗi nhân vật có 5 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy
+- **Tủ đồ (10 bộ)** — đã bỏ cùng Milo/Luna/Chibi (Jake/Miku mặc đồ gốc trong GLB, xem
+  trên; bảng OUTFITS vẫn còn trong app.js nhưng không còn lựa chọn nào dùng): mỗi nhân vật có 5 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy
   qua Firebase. Milo: Street, Denim (áo khoác jean + quần jean + tóc ngắn), Thể thao
   (băng đô + tóc xoăn + áo cam + quần đùi), Mùa đông (mũ len + áo len cổ lọ + bốt),
   **Hắc Ám** (áo khoác denim đen mở để lộ sơ mi trắng + ve áo + dây chuyền bạc có mặt dây

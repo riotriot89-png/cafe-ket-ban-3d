@@ -6,23 +6,31 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { TEX } from './vendor/textures.js'; // texture ảnh thật (sàn gỗ, gạch, đá, cỏ) dạng base64
 
-/* ---- Chibi 3D thật (file Chibi_Base_Mesh.blend người dùng gửi) ----
-   Mesh đã rig sẵn 20 xương + 4 animation (Idle/Walk/Sit/Drink), xuất GLB.
-   Tải trước ở nền để lúc chọn nhân vật Chibi là có ngay. */
-let chibiGLB = null;
-const chibiGLBPromise = new Promise((resolve) => {
-  new GLTFLoader().load('./vendor/chibi-base-mesh.glb',
-    (g) => { chibiGLB = g; resolve(g); },
-    undefined,
-    () => { console.warn('Không tải được chibi GLB, dùng nhân vật thường.'); resolve(null); });
-});
+/* ---- Nhân vật GLB thật tải trên mạng (Jake + Miku) ----
+   Mỗi nhân vật là 1 file GLB duy nhất (đã gộp Idle + Walk, texture hạ 4K->2K):
+   - Jake: nam, file Meshy AI "Desolate City Survivor", 24 xương, cao 1,70m
+   - Miku: nữ mèo, file Meshy AI "Cat Girl Miku", 24 xương, cao 1,70m
+   Cả 2 đều là 1 mesh liền (quần áo/tai/đuôi/gậy dính liền, không tách được),
+   mặt hướng +Z. Tải trước ở nền để lúc chọn nhân vật là có ngay. */
+const GLB_FILES = { jake: './vendor/jake.glb', miku: './vendor/miku.glb' };
+const glbData = { jake: null, miku: null };
+const glbPromises = {};
+for (const [key, url] of Object.entries(GLB_FILES)) {
+  glbPromises[key] = new Promise((resolve) => {
+    new GLTFLoader().load(url,
+      (g) => { glbData[key] = g; resolve(g); },
+      undefined,
+      () => { console.warn('Không tải được GLB', key, ', dùng nhân vật thường.'); resolve(null); });
+  });
+}
 
 /* ============ DỮ LIỆU ============ */
-/* 3 nhân vật — Milo (nam), Luna (nữ) và Chibi (thân 3D thật từ file .blend). */
+/* CHỈ 2 nhân vật — Jake (nam) và Miku (nữ), đều là model GLB thật.
+   Milo/Luna/Chibi đã gỡ khỏi màn chào (code dựng nhân vật procedural
+   Milo/Luna vẫn còn trong file nhưng không còn lựa chọn nào dùng tới). */
 const CHARACTERS = [
-  { name: 'Milo', gender: 'Nam', outfit: 'male', outfitId: 'street', desc: 'Năng động, thích cà phê đen và nhạc lofi.', skin: 0xf2c89b, hair: 0x2b1a12, eye: 0x2e1a12 },
-  { name: 'Luna', gender: 'Nữ', outfit: 'female', outfitId: 'chic', desc: 'Dịu dàng, hay ngồi sân vườn đọc sách.', skin: 0xffe0bd, hair: 0x7c4a2d, eye: 0x7c4a21 },
-  { name: 'Chibi', gender: 'Chibi', outfit: 'chibi', outfitId: 'default', desc: 'Nhỏ xinh đầu to, thân 3D thật có xương + animation.', skin: 0xf2c89b, hair: 0x2b1a12, eye: 0x2e1a12, chibi: true },
+  { name: 'Jake', gender: 'Nam', outfit: 'glb', outfitId: 'default', desc: 'Người sống sót thành phố hoang tàn, áo da nâu, gậy bóng chày.', glb: 'jake' },
+  { name: 'Miku', gender: 'Nữ', outfit: 'glb', outfitId: 'default', desc: 'Mèo trắng tai mèo, áo hồng dấu chân mèo, đuôi dài.', glb: 'miku' },
 ];
 
 /* ---- Hệ thống trang phục (dữ liệu, không phải code cứng) ----
@@ -1732,23 +1740,24 @@ function buildOutfit(spec, outfit, P, M) {
   });
 }
 
-/* ---- Nhân vật Chibi dùng thân GLB thật (Chibi_Base_Mesh.blend) ----
-   Mesh đã rig 20 xương + 4 animation. Clone GLB đã tải trước, gắn mixer.
-   Chibi cao 2.646 (chân ở Y -1.432) -> scale 0.7 + nâng 1.432 để cao ~1.85,
-   chân chạm đất như Milo/Luna. */
-function buildChibiCharacter(spec) {
+/* ---- Nhân vật GLB thật (Jake / Miku, file Meshy AI) ----
+   Clone GLB đã tải trước, gắn mixer. Cả 2 cao 1,70m, chân ở y=0 nên không
+   cần scale/nâng như Chibi trước đây. Mặt hướng +Z (đã kiểm chứng bằng
+   render trước/sau: camera +Z thấy mặt, -Z thấy lưng/đuôi).
+   Sit/Drink KHÔNG có clip sẵn trong file gốc -> làm bằng code (xem
+   updateGLBCharacter): sau mixer.update() sẽ xoay trực tiếp xương đùi/cẳng/
+   tay phải theo góc đã đo bằng ảnh test thật (đùi rotateX -1.5, cẳng +1.45,
+   tay uống -1.30/-1.55). Không làm clip Blender vì tail xương Meshy bị rác
+   (hướng tail vô nghĩa) nên trục xoay trong Blender đoán không ra. */
+function buildGLBCharacter(spec) {
   const group = new THREE.Group();
-  const rig = new THREE.Group(); rig.scale.set(0.7, 0.7, 0.7); group.add(rig);
-  const model = SkeletonUtils.clone(chibiGLB.scene);
-  model.position.y = 1.432; // chân từ -1.432 -> 0
-  rig.add(model);
-  // Tìm xương đầu + tay phải (để gắn ly + lấy vị trí tên/bong bóng)
-  let headBone = null, handBoneR = null;
-  model.traverse((o) => {
-    if (o.isBone && o.name === 'Head') headBone = o;
-    if (o.isBone && o.name === 'Hand.R') handBoneR = o;
-  });
-  if (!headBone) headBone = model; // fallback: dùng cả model nếu không tìm thấy xương
+  const model = SkeletonUtils.clone(glbData[spec.glb].scene);
+  group.add(model);
+  // Tìm xương cần dùng (tên xương Jake và Miku giống hệt nhau)
+  const bones = {};
+  model.traverse((o) => { if (o.isBone) bones[o.name] = o; });
+  const headBone = bones.Head || model;
+  const handBoneR = bones.RightHand;
   // Ly cà phê gắn vào tay phải (hiện khi uống, như nhân vật thường)
   const cupG = new THREE.Group(); cupG.position.set(0, -0.08, 0.05);
   const cupM = new THREE.Mesh(SHARED_GEO.cup, MAT.cupWhite); cupM.castShadow = true; cupG.add(cupM);
@@ -1758,20 +1767,32 @@ function buildChibiCharacter(spec) {
   // Bóng mềm dưới chân
   const shadowDisc = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.95), new THREE.MeshBasicMaterial({ map: SHADOW_TEX, transparent: true, depthWrite: false }));
   shadowDisc.rotation.x = -Math.PI / 2; shadowDisc.position.set(-0.12, 0.02, -0.08); group.add(shadowDisc);
-  // Animation mixer + các clip
+  // Animation mixer + các clip (Idle, Walk đã gộp trong file)
   const mixer = new THREE.AnimationMixer(model);
   const clips = {};
-  chibiGLB.animations.forEach((clip) => { clips[clip.name] = mixer.clipAction(clip); });
-  // Thu thập chất liệu để làm mờ khi che tầm nhìn (như nhân vật thường)
+  glbData[spec.glb].animations.forEach((clip) => { clips[clip.name] = mixer.clipAction(clip); });
+  // Thu thập chất liệu để làm mờ khi che tầm nhìn (như nhân vật thường).
+  // QUAN TRỌNG: SkeletonUtils.clone() share material giữa các bản clone,
+  // nên phải clone material riêng cho từng người, không thì mờ 1 người là
+  // mờ cả quán (cùng 1 material instance).
   const mats = [];
   model.traverse((o) => {
-    if (o.isMesh && o.material && o.material !== MAT.cupWhite && o.material !== MAT.coffee && !mats.includes(o.material)) {
+    if (o.isMesh && o.material && o.material !== MAT.cupWhite && o.material !== MAT.coffee) {
+      o.material = o.material.clone();
       o.material.baseOpacity = o.material.opacity;
       o.material.userData.keepTransparent = o.material.transparent;
-      mats.push(o.material);
+      if (!mats.includes(o.material)) mats.push(o.material);
     }
     if (o.isMesh) o.castShadow = true;
   });
+  // Xương dùng cho tư thế ngồi/uống bằng code + tư thế gốc (bind pose) của chúng.
+  // Mixer ghi đè quaternion mỗi frame nên phải lưu base để tính target tuyệt đối.
+  const poseBones = {};
+  const POSE_NAMES = { thighL: 'LeftUpLeg', thighR: 'RightUpLeg', shinL: 'LeftLeg', shinR: 'RightLeg', armR: 'RightArm', foreR: 'RightForeArm', head: 'Head' };
+  for (const [key, name] of Object.entries(POSE_NAMES)) {
+    if (bones[name]) poseBones[key] = { bone: bones[name], base: bones[name].quaternion.clone() };
+  }
+  const hipsRestY = bones.Hips ? bones.Hips.position.y : 0.95;
   // parts giả lập đủ cho code chung (tên/bong bóng dùng head, uống dùng cupG)
   const dummy = () => ({ rotation: { x: 0 }, position: { x: 0, y: 0, z: 0 } });
   const parts = {
@@ -1779,13 +1800,13 @@ function buildChibiCharacter(spec) {
     legL: { thigh: dummy(), shin: dummy() }, legR: { thigh: dummy(), shin: dummy() },
     armL: { upper: dummy(), fore: dummy() }, armR: { upper: dummy(), fore: dummy() },
   };
-  return { group, rig, mats, parts, mixer, clips, isChibi: true, headBone };
+  return { group, rig: group, mats, parts, mixer, clips, isGLB: true, headBone, bones, poseBones, hipsRestY, _sitK: 0 };
 }
 
 function buildCharacter(spec) {
-  if (spec.chibi) {
-    if (!chibiGLB) return buildCharacter({ ...spec, chibi: false, outfit: 'male', outfitId: 'street' }); // GLB chưa tải xong: tạm dùng Milo
-    return buildChibiCharacter(spec);
+  if (spec.glb) {
+    if (!glbData[spec.glb]) return buildCharacter({ ...spec, glb: null, outfit: 'male', outfitId: 'street' }); // GLB chưa tải xong/lỗi: tạm dùng Milo
+    return buildGLBCharacter(spec);
   }
   const outfit = OUTFITS[spec.outfit]?.[spec.outfitId] || Object.values(OUTFITS[spec.outfit])[0];
   // Cel-shading kiểu Genshin: da/áo/tóc dùng toon material (3 vùng sáng rõ rệt)
@@ -1941,6 +1962,7 @@ function sitDown(c, seat, instant = false) {
   c.group.rotation.y = seat.angle;
   if (instant) {
     c.pose = { ...c.poseTarget, thighL: -1.5, thighR: -1.5, shinL: 1.45, shinR: 1.45, rigY: -0.42, shL: -0.25, shR: -0.25 };
+    if (c.isGLB) c._sitK = 1; // ngồi ngay: vào thẳng tư thế ngồi, khỏi lerp từ đứng
   }
   if (c.id === 'me') publishMe(true);
 }
@@ -1965,37 +1987,74 @@ function freeSeatNear(zone) {
 
 /* ---- Hoạt ảnh từng khung hình ---- */
 const _v = new THREE.Vector3();
-/* ---- Animation cho nhân vật Chibi (GLB) qua AnimationMixer ----
-   Chọn clip theo trạng thái: uống > ngồi > đi > đứng. Sit/Drink giữ tư thế
-   cuối (LoopOnce + clamp), Idle/Walk lặp. Chuyển clip bằng fade 0.25s. */
-function playChibiAnim(c, name) {
+/* ---- Animation cho nhân vật GLB (Jake/Miku) qua AnimationMixer ----
+   Clip thật chỉ có Idle + Walk (đã gộp trong file). Ngồi/Uống không có clip
+   nên làm bằng code: sau mixer.update() sẽ slerp xương về tư thế mục tiêu
+   (tính từ bind pose, góc đo bằng ảnh test thật). _curAnim báo trạng thái
+   thật (Drink/Sit/Walk/Idle) để hook kiểm chứng đọc được, dù mixer bên
+   dưới vẫn chạy Idle khi ngồi/uống. */
+const _qTmp = new THREE.Quaternion();
+const _eTmp = new THREE.Euler();
+function playGLBAnim(c, name) {
   const next = c.clips?.[name];
   if (!next) return;
-  if (c._curAnim === name && next.isRunning()) return;
+  if (c._curAction === next && next.isRunning()) return;
   const prev = c._curAction;
   if (prev && prev !== next) prev.fadeOut(0.25);
   next.reset();
-  if (name === 'Sit' || name === 'Drink') {
-    next.setLoop(THREE.LoopOnce, 1);
-    next.clampWhenFinished = true;
-  } else {
-    next.setLoop(THREE.LoopRepeat, Infinity);
-  }
+  next.setLoop(THREE.LoopRepeat, Infinity);
   next.fadeIn(0.25).play();
   c._curAction = next;
-  c._curAnim = name;
 }
-function updateChibiAnim(c, dt) {
+function glbPoseTo(c, key, angleX, k) {
+  const pb = c.poseBones?.[key];
+  if (!pb || k <= 0) return;
+  _eTmp.set(angleX, 0, 0);
+  _qTmp.setFromEuler(_eTmp);
+  _qTmp.premultiply(pb.base);
+  pb.bone.quaternion.slerp(_qTmp, Math.min(1, k));
+}
+function updateGLBCharacter(c, dt) {
   // Phát hiện người thật đang đi (di chuyển vị trí giữa 2 frame)
   const moved = c._prevX !== undefined && (Math.abs(c.group.position.x - c._prevX) > 0.001 || Math.abs(c.group.position.z - c._prevZ) > 0.001);
   c._prevX = c.group.position.x; c._prevZ = c.group.position.z;
-  let name;
-  if (c.drink > 0) name = 'Drink';
-  else if (c.mode === 'sit') name = 'Sit';
-  else if (c.mode === 'walk' || (c.mode === 'free' && c.moveDir) || moved) name = 'Walk';
-  else name = 'Idle';
-  playChibiAnim(c, name);
+  const walking = c.mode === 'walk' || (c.mode === 'free' && c.moveDir) || moved;
+  const clip = walking ? 'Walk' : 'Idle';
+  playGLBAnim(c, clip);
   c.mixer.update(dt);
+  // Trạng thái báo ra ngoài (hook __cafePose/__cafeDebug đọc)
+  c._curAnim = c.drink > 0 ? 'Drink' : c.mode === 'sit' ? 'Sit' : clip;
+  // Ngồi: đùi gập về trước -1.5, cẳng gập +1.45 (cẳng gần như đứng thẳng),
+  // hông hạ từ ~0.95 xuống ~0.48 (vừa tầm ghế). Lerp mượt theo _sitK.
+  const kSit = 1 - Math.exp(-dt * 9);
+  c._sitK = (c._sitK ?? 0) + ((c.mode === 'sit' ? 1 : 0) - (c._sitK ?? 0)) * kSit;
+  glbPoseTo(c, 'thighL', -1.5, c._sitK);
+  glbPoseTo(c, 'thighR', -1.5, c._sitK);
+  glbPoseTo(c, 'shinL', 1.45, c._sitK);
+  glbPoseTo(c, 'shinR', 1.45, c._sitK);
+  if (c.bones?.Hips) {
+    const targetY = c.hipsRestY - 0.47 * (c._sitK ?? 0);
+    c.bones.Hips.position.y += (targetY - c.bones.Hips.position.y) * kSit;
+  }
+  // Uống: tay phải đưa ly lên miệng theo đúng keyframe của quán (3,6s).
+  // Góc đo bằng ảnh test: vai -1.30 + khuỷu -1.55 đưa bàn tay lên ngang mặt.
+  if (c.drink > 0) {
+    const d = Math.min(1, c.drinkTimer / 3.6);
+    const keys = [
+      [0.00, 0, 0], [0.25, -0.95, -0.35], [0.50, -1.30, -1.55],
+      [0.75, -1.30, -1.55], [0.90, -0.95, -0.35], [1.00, 0, 0],
+    ];
+    let i = 0;
+    while (i < keys.length - 2 && d > keys[i + 1][0]) i++;
+    const [t0, s0, f0] = keys[i], [t1, s1, f1] = keys[i + 1];
+    const kk = smoothstep(0, 1, (d - t0) / Math.max(0.001, t1 - t0));
+    const shR = s0 + (s1 - s0) * kk, foreR = f0 + (f1 - f0) * kk;
+    // Mở dần lúc bắt đầu cầm ly, khép dần lúc đặt ly xuống
+    const env = smoothstep(0, 0.15, d) * (1 - smoothstep(0.9, 1, d));
+    glbPoseTo(c, 'armR', shR, env);
+    glbPoseTo(c, 'foreR', foreR, env);
+    glbPoseTo(c, 'head', -0.22 * smoothstep(0.4, 0.55, d) * (1 - smoothstep(0.8, 0.95, d)), 1);
+  }
 }
 function updateCharacter(c, dt, t) {
   const p = c.pose, pt = c.poseTarget;
@@ -2139,9 +2198,9 @@ function updateCharacter(c, dt, t) {
     if (c.seat) c.seat.cup.visible = !hasCup;
     if (d >= 1) { c.drink = 0; c.drinkTimer = 0; if (c.parts.cupG) { c.parts.cupG.rotation.x = 0; c.parts.cupG.visible = false; } if (c.seat) c.seat.cup.visible = true; }
   }
-  // Nhân vật Chibi (GLB): dùng AnimationMixer thay vì xoay khớp procedural
-  if (c.isChibi) {
-    updateChibiAnim(c, dt);
+  // Nhân vật GLB (Jake/Miku): dùng AnimationMixer + overlay tư thế ngồi/uống bằng code
+  if (c.isGLB) {
+    updateGLBCharacter(c, dt);
     if (c.bubbleEl && performance.now() > c.bubbleUntil) { c.bubbleEl.remove(); c.bubbleEl = null; }
     return;
   }
@@ -2521,24 +2580,39 @@ pvScene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.3));
 const pvDir = new THREE.DirectionalLight(0xffffff, 1.6);
 pvDir.position.set(3, 5, 4); pvScene.add(pvDir);
 const pvCam = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
-pvCam.position.set(0, 1.7, 4.6); pvCam.lookAt(0, 1.0, 0);
+pvCam.position.set(0, 1.55, 4.2); pvCam.lookAt(0, 0.85, 0); // Jake/Miku cao 1,70m
 const pvDisc = new THREE.Mesh(new THREE.CircleGeometry(0.95, 28), new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.9 }));
 pvDisc.rotation.x = -Math.PI / 2; pvScene.add(pvDisc);
+const pvClock = new THREE.Clock(); // đồng hồ riêng cho animation xem trước
 let pvChar = null;
+let pvGen = 0; // chống race: showPreview gọi đồng thời (init + bấm chọn) phải
+// chờ GLB xong mới xóa nhân vật cũ — xóa trước await thì các lần gọi sau
+// không thấy nhân vật cũ để xóa, Jake và Miku chồng lên nhau trong khung xem trước.
 async function showPreview(i, outfitId) {
-  if (pvChar) pvScene.remove(pvChar.group);
+  const gen = ++pvGen;
   const spec = { ...CHARACTERS[i], outfitId: outfitId || state.myOutfit || CHARACTERS[i].outfitId };
-  // Chibi cần GLB tải xong mới dựng được: chờ 1 nhịp rồi dựng lại
-  if (spec.chibi && !chibiGLB) await chibiGLBPromise;
+  // Nhân vật GLB cần file tải xong mới dựng được: chờ 1 nhịp rồi dựng lại
+  if (spec.glb && !glbData[spec.glb]) await glbPromises[spec.glb];
+  if (gen !== pvGen) return; // đã có lần xem trước mới hơn, bỏ lần này
+  if (pvChar) pvScene.remove(pvChar.group);
   const b = buildCharacter(spec);
   pvScene.add(b.group);
   pvChar = b;
 }
-/* Ô chọn trang phục ở màn chào: mỗi nhân vật có 4 bộ, bấm là xem trước ngay */
+/* Ô chọn trang phục ở màn chào — Jake/Miku là model GLB liền khối, đồ gốc
+   dính trong file nên chỉ có 1 bộ "Mặc định", không còn lưới chọn đồ nữa. */
 function renderOutfits(charIdx) {
   const spec = CHARACTERS[charIdx];
   const grid = $('outfit-grid');
   grid.innerHTML = '';
+  const label = $('outfit-label');
+  if (spec.glb) {
+    if (label) label.classList.add('hidden');
+    grid.classList.add('hidden');
+    return;
+  }
+  if (label) label.classList.remove('hidden');
+  grid.classList.remove('hidden');
   Object.entries(OUTFITS[spec.outfit]).forEach(([id, o]) => {
     const b = document.createElement('button');
     b.className = 'outfit-btn' + (id === state.myOutfit ? ' active' : '');
@@ -2588,9 +2662,9 @@ async function enterCafe() {
   state.myName = name;
   $('welcome').classList.add('hidden');
   if (state.players.has('me')) removeCharacter('me');
-  // Chibi cần GLB tải xong mới vào được
+  // Nhân vật GLB cần file tải xong mới vào được
   const spec = { ...CHARACTERS[state.myChar], outfitId: state.myOutfit || CHARACTERS[state.myChar].outfitId };
-  if (spec.chibi && !chibiGLB) await chibiGLBPromise;
+  if (spec.glb && !glbData[spec.glb]) await glbPromises[spec.glb];
   spawnCharacter('me', name, spec, { x: 0, z: 15.5 });
   state.entered = true;
   localStorage.setItem('cafe3d_name', name);
@@ -2620,9 +2694,8 @@ $('btn-enter').addEventListener('click', enterCafe);
 $('player-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') enterCafe(); });
 
 /* ============ KHỞI TẠO QUÁN ============ */
-state.myOutfit = localStorage.getItem('cafe3d_outfit_0') || CHARACTERS[0].outfitId;
-renderOutfits(0);
-showPreview(0);
+// Chỉ gọi showPreview 1 lần ở khối savedChar bên dưới (mặc định là char 0):
+// gọi 2 lần sẽ tạo 2 lần xem trước đồng thời, dễ chồng nhân vật lên nhau.
 const savedName = localStorage.getItem('cafe3d_name');
 if (savedName) $('player-name').value = savedName;
 const savedChar = parseInt(localStorage.getItem('cafe3d_char') || '0', 10);
@@ -2632,6 +2705,12 @@ if (CHARACTERS[savedChar]) {
   grid.querySelectorAll('.char-card').forEach((el, i) => el.classList.toggle('selected', i === savedChar));
   renderOutfits(savedChar);
   showPreview(savedChar);
+} else {
+  // Nhân vật đã lưu không còn nữa (vd Milo/Luna/Chibi cũ): về lại Jake
+  state.myChar = 0;
+  state.myOutfit = CHARACTERS[0].outfitId;
+  renderOutfits(0);
+  showPreview(0);
 }
 log('<span class="sys">☕ Chào mừng đến Café Kết Bạn 3D — quán có 100 ghế, chọn nhân vật rồi vào chơi nhé!</span>');
 fbInit();
@@ -2648,12 +2727,13 @@ if (qp.has('autojoin')) {
     state.myChar = ch;
     const outfitParam = qp.get('outfit');
     state.myOutfit = (outfitParam && OUTFITS[CHARACTERS[ch].outfit]?.[outfitParam]) ? outfitParam : (localStorage.getItem('cafe3d_outfit_' + ch) || CHARACTERS[ch].outfitId);
+    if (CHARACTERS[ch].glb) state.myOutfit = 'default'; // Jake/Miku chỉ có 1 bộ mặc định
     grid.querySelectorAll('.char-card').forEach((el, i) => el.classList.toggle('selected', i === ch));
     renderOutfits(ch);
     showPreview(ch);
   }
   setTimeout(async () => {
-    await enterCafe(); // chờ GLB (nếu chọn Chibi) rồi mới ngồi/uống
+    await enterCafe(); // chờ GLB (Jake/Miku) rồi mới ngồi/uống
     if (qp.has('sit')) {
       setTimeout(() => {
         const me = state.players.get('me');
@@ -2772,9 +2852,9 @@ function animate() {
   const me = state.players.get('me');
   const isFP = state.camMode === 3 && me;
   if (me) {
-    // Chibi là 1 mesh liền (không tách được riêng đầu) -> ẩn cả người ở góc thứ nhất,
+    // Jake/Miku là 1 mesh liền (không tách được riêng đầu) -> ẩn cả người ở góc thứ nhất,
     // nhân vật thường thì chỉ ẩn đầu để vẫn thấy tay/thân
-    if (me.isChibi) me.group.visible = !isFP;
+    if (me.isGLB) me.group.visible = !isFP;
     else me.parts.head.visible = !isFP;
   }
   controls.enabled = !isFP;
@@ -2805,10 +2885,12 @@ function animate() {
   cssRenderer.render(scene, camera);
   if (pvChar && !$('welcome').classList.contains('hidden')) {
     pvChar.group.rotation.y += dt * 0.8;
-    // Chibi ở màn chào: chạy animation Idle để xem trước sống động
-    if (pvChar.isChibi && pvChar.clips?.Idle) {
-      if (pvChar._curAnim !== 'Idle') playChibiAnim(pvChar, 'Idle');
-      pvChar.mixer.update(dt);
+    // Nhân vật GLB ở màn chào: chạy animation Idle để xem trước sống động.
+    // Dùng đồng hồ riêng (không kẹp dt 0.05 như vòng lặp game) để Idle chạy
+    // đúng tốc độ thật, tay hạ xuống ngay thay vì kẹt ở tư thế T-pose.
+    if (pvChar.isGLB && pvChar.clips?.Idle) {
+      if (pvChar._curAction !== pvChar.clips.Idle) playGLBAnim(pvChar, 'Idle');
+      pvChar.mixer.update(Math.min(pvClock.getDelta(), 0.25));
     }
     pvRenderer.render(pvScene, pvCam);
   }
@@ -2833,7 +2915,7 @@ window.__cafeCam = (x, y, z, tx, ty, tz) => {
 window.__cafeDebug = () => [...state.players.values()].map((c) => ({
   id: c.id, mode: c.mode, x: +c.group.position.x.toFixed(1), z: +c.group.position.z.toFixed(1),
   path: c.path.length, seat: c.seat ? c.seat.id : null, drink: c.drink, fade: +(c._fade ?? 1).toFixed(2),
-  rotY: +c.group.rotation.y.toFixed(2), chibi: !!c.isChibi,
+  rotY: +c.group.rotation.y.toFixed(2), glb: !!c.isGLB,
 }));
 window.__cafePose = () => {
   const me = state.players.get('me');
@@ -2842,7 +2924,7 @@ window.__cafePose = () => {
     drink: me.drink, drinkTimer: +me.drinkTimer.toFixed(2),
     shR: +me.pose.shR.toFixed(2), foreR: +me.pose.foreR.toFixed(2),
     cupInHand: me.parts.cupG.visible, tableCup: me.seat ? me.seat.cup.visible : null,
-    chibi: !!me.isChibi, anim: me._curAnim || null,
+    glb: !!me.isGLB, anim: me._curAnim || null,
   };
 };
 window.__cafeTV = { isOn: () => true };
