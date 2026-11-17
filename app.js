@@ -1201,6 +1201,28 @@ HALL_X.forEach((x) => HALL_Z.forEach((z) => makeTable(x, z, 'hall')));
 const TERR_Z = [8.5, 12.5];
 HALL_X.forEach((x) => TERR_Z.forEach((z) => makeTable(x, z, 'terrace')));
 [[-13, -4], [-13, 4], [13, -4], [13, 0], [13, 4]].forEach(([x, z]) => makeTable(x, z, 'lounge'));
+// Vật cản khi di chuyển tự do (WASD/joystick): 25 bàn tròn + quầy bar + sofa lounge
+const TABLE_POS = [];
+HALL_X.forEach((x) => HALL_Z.forEach((z) => TABLE_POS.push([x, z])));
+HALL_X.forEach((x) => TERR_Z.forEach((z) => TABLE_POS.push([x, z])));
+[[-13, -4], [-13, 4], [13, -4], [13, 0], [13, 4]].forEach(([x, z]) => TABLE_POS.push([x, z]));
+const OBSTACLES = [
+  { x0: 12.9, x1: 16.3, z0: -8.85, z1: -2.15 }, // quầy bar
+  { x0: -15.9, x1: -14.5, z0: -2.9, z1: -0.1 }, // sofa trái trên
+  { x0: -15.9, x1: -14.5, z0: 0.1, z1: 2.9 }, // sofa trái dưới
+  { x0: 14.5, x1: 15.9, z0: -2.9, z1: -0.1 }, // sofa phải trên
+];
+function blocked(x, z) {
+  for (const [tx, tz] of TABLE_POS) {
+    const dx = x - tx, dz = z - tz;
+    if (dx * dx + dz * dz < 1.0) return true; // bàn r 0.78 + người ~0.2
+  }
+  for (const o of OBSTACLES) {
+    if (x > o.x0 && x < o.x1 && z > o.z0 && z < o.z1) return true;
+  }
+  if (x < -16.5 || x > 16.5 || z < -9.5 || z > 16.5) return true; // tường quán
+  return false;
+}
 // Thảm lounge
 [[-13, -4], [-13, 4], [13, -4], [13, 0], [13, 4]].forEach(([x, z], i) => {
   const rug = new THREE.Mesh(new THREE.CircleGeometry(2.1, 32), new THREE.MeshStandardMaterial({ map: rugTexture(i % 2 ? '#0369a1' : '#be185d', i % 2 ? '#bae6fd' : '#f9a8d4'), roughness: 1 }));
@@ -1872,6 +1894,28 @@ function updateCharacter(c, dt, t) {
     pt.foreL = -0.15; pt.foreR = -0.15;
     pt.rigY = Math.abs(Math.cos(c.walkPhase)) * 0.045;
     pt.headX = 0; pt.headY = 0;
+  } else if (c.mode === 'free' && c.moveDir) {
+    // Di chuyển tự do (WASD / joystick): đi thẳng theo hướng nhập, có va chạm
+    const step = c.speed * dt;
+    const nx = c.group.position.x + c.moveDir.x * step;
+    const nz = c.group.position.z + c.moveDir.z * step;
+    // Va chạm: thử đi chéo, nếu kẹt thì trượt dọc theo 1 trục (đi men theo bàn)
+    if (!blocked(nx, nz)) { c.group.position.x = nx; c.group.position.z = nz; }
+    else if (!blocked(nx, c.group.position.z)) { c.group.position.x = nx; }
+    else if (!blocked(c.group.position.x, nz)) { c.group.position.z = nz; }
+    const targetRot = Math.atan2(c.moveDir.x, c.moveDir.z);
+    let dr = targetRot - c.group.rotation.y;
+    while (dr > Math.PI) dr -= Math.PI * 2;
+    while (dr < -Math.PI) dr += Math.PI * 2;
+    c.group.rotation.y += dr * Math.min(1, dt * 8);
+    c.walkPhase += dt * 9;
+    const s = Math.sin(c.walkPhase);
+    pt.thighL = s * 0.55; pt.thighR = -s * 0.55;
+    pt.shinL = 0.25 + Math.max(0, -s) * 0.5; pt.shinR = 0.25 + Math.max(0, s) * 0.5;
+    pt.shL = -s * 0.45; pt.shR = s * 0.45;
+    pt.foreL = -0.15; pt.foreR = -0.15;
+    pt.rigY = Math.abs(Math.cos(c.walkPhase)) * 0.045;
+    pt.headX = 0; pt.headY = 0;
   } else if (c.mode === 'sit') {
     pt.thighL = -1.5; pt.thighR = -1.5; pt.shinL = 1.45; pt.shinR = 1.45;
     pt.shL = -0.25; pt.shR = -0.25; pt.foreL = -0.25; pt.foreR = -0.25;
@@ -2036,6 +2080,128 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (o.userData.floor && me) walkTo(me, hits[0].point.x, hits[0].point.z);
 });
 
+/* ============ DI CHUYỂN TỰ DO: WASD (PC) + JOYSTICK (ĐIỆN THOẠI) + NÚT NGỒI ============ */
+function standUp(c) {
+  if (!c) return;
+  if (c.seat) freeSeat(c.seat);
+  c.seat = null; c.mode = 'idle'; c.path = []; c.pendingSeat = null;
+  if (c.id === 'me') publishMe(true);
+}
+// Hướng di chuyển theo camera (WASD/joystick): W = xa camera, S = về phía camera
+const keysDown = new Set();
+let joyActive = false, joyVec = { x: 0, y: 0 };
+function camForward() {
+  const f = new THREE.Vector3();
+  camera.getWorldDirection(f);
+  f.y = 0;
+  if (f.lengthSq() < 0.001) f.set(0, 0, -1);
+  return f.normalize();
+}
+// Chạy mỗi khung hình: đọc phím/joystick hiện tại, tính hướng theo camera lúc đó
+function updateMyMovement() {
+  const me = state.players.get('me');
+  if (!me || !state.entered) return;
+  let fz = 0, rx = 0;
+  if (keysDown.has('w') || keysDown.has('arrowup')) fz += 1;
+  if (keysDown.has('s') || keysDown.has('arrowdown')) fz -= 1;
+  if (keysDown.has('d') || keysDown.has('arrowright')) rx += 1;
+  if (keysDown.has('a') || keysDown.has('arrowleft')) rx -= 1;
+  if (joyActive) { fz += -joyVec.y; rx += joyVec.x; }
+  if (!fz && !rx) {
+    if (me.mode === 'free') { me.mode = 'idle'; me.moveDir = null; }
+    return;
+  }
+  // Đang ngồi mà bấm di chuyển thì đứng dậy rồi đi
+  if (me.mode === 'sit') standUp(me);
+  const f = camForward();
+  const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0));
+  const dir = new THREE.Vector3().addScaledVector(f, fz).addScaledVector(r, rx);
+  dir.y = 0;
+  if (dir.lengthSq() < 0.001) return;
+  dir.normalize();
+  me.moveDir = { x: dir.x, z: dir.z };
+  me.mode = 'free';
+  me.path = []; me.pendingSeat = null;
+}
+window.addEventListener('keydown', (e) => {
+  if (!state.entered || document.activeElement === $('chat-input')) return;
+  const k = e.key.toLowerCase();
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+    keysDown.add(k);
+    e.preventDefault();
+  }
+});
+window.addEventListener('keyup', (e) => keysDown.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => keysDown.clear());
+// Joystick: kéo nút tròn để di chuyển (chỉ hiện trên điện thoại/cảm ứng)
+function initJoystick() {
+  const joy = $('joystick'), knob = $('joy-knob');
+  if (!joy || !knob) return;
+  const R = 44; // bán kính kéo tối đa (px)
+  let pid = null;
+  const setKnob = (dx, dy) => {
+    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  };
+  const updateFromEvent = (e) => {
+    const rect = joy.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const len = Math.hypot(dx, dy);
+    if (len > R) { dx = (dx / len) * R; dy = (dy / len) * R; }
+    setKnob(dx, dy);
+    joyVec = { x: dx / R, y: dy / R };
+    joyActive = true;
+  };
+  joy.addEventListener('pointerdown', (e) => {
+    pid = e.pointerId;
+    joy.setPointerCapture(pid);
+    updateFromEvent(e);
+    e.preventDefault();
+  });
+  joy.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== pid) return;
+    updateFromEvent(e);
+    e.preventDefault();
+  });
+  const endJoy = (e) => {
+    if (e.pointerId !== pid) return;
+    pid = null; joyActive = false; joyVec = { x: 0, y: 0 };
+    setKnob(0, 0);
+  };
+  joy.addEventListener('pointerup', endJoy);
+  joy.addEventListener('pointercancel', endJoy);
+  // Chỉ hiện joystick trên thiết bị cảm ứng
+  joy.classList.toggle('hidden', !IS_MOBILE);
+}
+// Nút Ngồi: lại gần ghế trống thì hiện, bấm là ngồi vào ghế gần nhất;
+// đang ngồi thì nút đổi thành Đứng dậy
+let nearSeat = null;
+function updateSitButton() {
+  const btn = $('btn-sit');
+  const me = state.players.get('me');
+  if (!btn || !me || !state.entered) { if (btn) btn.classList.add('hidden'); nearSeat = null; return; }
+  if (me.mode === 'sit') {
+    btn.textContent = '🚶 Đứng dậy';
+    btn.classList.remove('hidden');
+    nearSeat = null;
+    return;
+  }
+  // Tìm ghế trống gần nhất (trong 1,8m)
+  let best = null, bestD = 1.8;
+  for (const s of state.seats) {
+    if (s.occupiedBy) continue;
+    const d = Math.hypot(s.x - me.group.position.x, s.z - me.group.position.z);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  nearSeat = best;
+  if (best) {
+    btn.textContent = '🪑 Ngồi xuống';
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
+}
+
 /* ============ HỒ SƠ + KẾT BẠN ============ */
 let profileId = null;
 function openProfile(id, x, y) {
@@ -2120,6 +2286,13 @@ $('btn-coffee').addEventListener('click', () => {
   toast('Cà phê của bạn đây, nhân vật sẽ nâng ly uống ☕');
   publishMe(true);
   setTimeout(() => publishMe(true), 3000);
+});
+// Nút Ngồi / Đứng dậy (hiện khi lại gần ghế trống hoặc đang ngồi)
+$('btn-sit').addEventListener('click', () => {
+  const me = state.players.get('me');
+  if (!me) return;
+  if (me.mode === 'sit') { standUp(me); toast('Đã đứng dậy, đi dạo tiếp nhé 🚶'); return; }
+  if (nearSeat) { walkTo(me, nearSeat.x, nearSeat.z, nearSeat); showZone(nearSeat.zone); }
 });
 const CAM_MODES = [
   { pos: [0, 15, 24], target: [0, 1, 2], label: 'Toàn cảnh quán' },
@@ -2345,6 +2518,8 @@ function animate() {
   // Bụi bay nhẹ nhàng trong ánh sáng
   const dust = scene.getObjectByName('dust');
   if (dust) { dust.rotation.y = t * 0.008; dust.position.y = Math.sin(t * 0.25) * 0.12; }
+  updateMyMovement(); // WASD / joystick: di chuyển tự do theo camera
+  updateSitButton(); // lại gần ghế trống thì hiện nút Ngồi
   for (const c of state.players.values()) updateCharacter(c, dt, t);
   // Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì mờ đi,
   // để xoay góc nhìn thoải mái mà không bị nhân vật che màn hình
@@ -2534,3 +2709,4 @@ addEventListener('resize', () => {
   if (!IS_MOBILE) $('chat-panel').classList.remove('mobile-hidden');
 });
 checkOrientation();
+initJoystick(); // joystick di chuyển cho điện thoại/cảm ứng

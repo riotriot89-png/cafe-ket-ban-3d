@@ -71,6 +71,16 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì tự mờ đi (chỉ còn ~12%
   độ đậm) để không che màn hình; xoay camera ra chỗ khác thì nhân vật hiện lại
   bình thường.
+- **Di chuyển tự do (2026-11-17)**: trên máy tính bấm **WASD** (hoặc phím mũi tên) để đi,
+  hướng đi theo camera (W = xa camera, A/D = trái/phải); trên điện thoại kéo **joystick**
+  tròn ở góc trái dưới. Nhân vật đi bộ có hoạt ảnh chân tay, không xuyên qua bàn/quầy/
+  sofa (va chạm tròn quanh bàn + hình chữ nhật quanh quầy bar và sofa, đi chéo bị kẹt
+  thì tự trượt dọc theo mép bàn), không ra khỏi quán. Đang ngồi mà bấm di chuyển thì
+  tự đứng dậy rồi đi. Bấm vào sàn vẫn đi tới điểm đó như trước.
+- **Ngồi bằng nút (2026-11-17)**: không cần bấm vào ghế nữa — lại gần ghế trống (trong
+  1,8m) thì nút **🪑 Ngồi xuống** hiện ở giữa dưới màn hình, bấm là nhân vật đi tới ngồi
+  vào ghế gần nhất; đang ngồi thì nút đổi thành **🚶 Đứng dậy**. Bấm vào ghế vẫn ngồi
+  được như trước.
 
 ## Chơi chung thật (người thật, không bot)
 

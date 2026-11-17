@@ -91,6 +91,12 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family:
 
 #btn-chat-toggle { display: none; position: fixed; right: 14px; bottom: 14px; z-index: 25; width: 52px; height: 52px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff; font-size: 24px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.5); align-items: center; justify-content: center; }
 
+/* Joystick di chuyển (điện thoại): đế tròn + nút kéo, góc trái dưới */
+#joystick { position: fixed; left: 18px; bottom: 96px; z-index: 25; width: 120px; height: 120px; border-radius: 50%; background: rgba(12,8,28,.45); border: 2px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); touch-action: none; }
+#joy-knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #db2777); border: 2px solid rgba(255,255,255,.6); box-shadow: 0 4px 16px rgba(0,0,0,.5); transform: translate(-50%, -50%); pointer-events: none; }
+/* Nút Ngồi / Đứng dậy: hiện khi lại gần ghế trống hoặc đang ngồi */
+#btn-sit { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 25; padding: 12px 26px; border-radius: 28px; border: 1px solid rgba(255,255,255,.4); background: linear-gradient(135deg, #059669, #10b981); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+
 #toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 40; background: rgba(12,8,28,.92); border: 1px solid rgba(255,255,255,.25); color: #fff; padding: 10px 18px; border-radius: 24px; font-size: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
 #ios-install { position: fixed; inset: 0; z-index: 50; background: rgba(5,2,15,.78); display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .ios-install-card { background: #1c1338; border: 1px solid rgba(255,255,255,.2); border-radius: 20px; padding: 22px; max-width: 420px; width: 100%; margin: auto; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
@@ -134,6 +140,7 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family:
   /* Chat thu gọn thành nút nổi như bản dọc */
   #btn-chat-toggle { display: flex; }
   #chat-panel.mobile-hidden { display: none; }
+  #chat-panel:not(.mobile-hidden) ~ #joystick { display: none; }
   #chat-panel { width: 300px; bottom: 12px; }
   #chat-log { height: 100px; }
   #hint { display: none; }
@@ -155,6 +162,7 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family:
   /* Chat thu gọn thành nút nổi, bấm mới mở để khỏi che màn hình */
   #btn-chat-toggle { display: flex; }
   #chat-panel.mobile-hidden { display: none; }
+  #chat-panel:not(.mobile-hidden) ~ #joystick { display: none; }
   #chat-panel { width: calc(100vw - 28px); bottom: 76px; }
   #chat-log { height: 120px; }
   #chat-input { font-size: 16px; padding: 11px 12px; }
