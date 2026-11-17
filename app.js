@@ -2811,8 +2811,6 @@ const FAST = new URLSearchParams(location.search).has('fast');
 const clock = new THREE.Clock();
 let tvTimer = 0;
 const _pv = new THREE.Vector3();
-const _ct = new THREE.Vector3();
-const _cc = new THREE.Vector3();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), FAST ? 0.5 : 0.05);
@@ -2825,30 +2823,10 @@ function animate() {
   updateMyMovement(); // WASD / joystick: di chuyển tự do theo camera
   updateSitButton(); // lại gần ghế trống thì hiện nút Ngồi
   for (const c of state.players.values()) updateCharacter(c, dt, t);
-  // Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì mờ đi,
-  // để xoay góc nhìn thoải mái mà không bị nhân vật che màn hình
-  for (const c of state.players.values()) {
-    _ct.copy(controls.target).sub(camera.position);
-    const distTarget = _ct.length();
-    _cc.set(c.group.position.x, c.group.position.y + 0.9, c.group.position.z).sub(camera.position);
-    const distChar = _cc.length();
-    const cos = _ct.normalize().dot(_cc.normalize());
-    // Nhân vật nào đứng chắn giữa camera và điểm đang nhìn thì mờ đi.
-    // NHƯNG ở góc theo chân (camMode 1) thì KHÔNG mờ ai cả: điểm nhìn chỉ
-    // cách nhân vật của mình 2,5m, nên bất cứ ai đứng trước mặt mình cũng
-    // nằm giữa camera và điểm nhìn -> bị tính là "chắn" và mờ còn 0.12,
-    // thành ra người khác tàng hình hết (Hoàng Phúc trong ảnh người dùng
-    // gửi). Ở góc này người trước mặt chính là người mình muốn thấy, nên
-    // tắt hẳn làm mờ. Các góc khác (toàn cảnh/tivi/thứ nhất) điểm nhìn xa,
-    // vẫn mờ theo hình học như cũ để khỏi che tivi.
-    const blocking = state.camMode === 1 ? false : (cos > 0.9 && distChar < distTarget - 1.5);
-    const target = blocking ? 0.12 : 1;
-    c._fade = (c._fade ?? 1) + (target - (c._fade ?? 1)) * Math.min(1, dt * 8);
-    for (const m of c.mats) {
-      m.transparent = m.userData.keepTransparent || c._fade < 0.99;
-      m.opacity = (m.baseOpacity ?? 1) * c._fade;
-    }
-  }
+  // KHÔNG làm mờ ai nữa (người dùng yêu cầu 2026-11-17): trước đây nhân vật
+  // đứng chắn giữa camera và điểm nhìn thì tự mờ còn 0.12, nhưng mờ quá đà
+  // thành tàng hình cả mình lẫn người khác. Giờ ai che thì người xem tự
+  // chỉnh camera (xoay/kéo) — nhân vật luôn hiện rõ 100%.
   // Gửi vị trí của mình lên Firebase khi đang đi (giới hạn 4 lần/giây).
   // BUG CŨ: chỉ publish khi mode === 'walk' (đi tự động tới ghế), còn đi tự do
   // WASD/joystick là mode 'free' nên KHÔNG publish — vị trí chỉ gửi theo
