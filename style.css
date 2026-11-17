@@ -27,6 +27,8 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family:
 #zone-label { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 15; font-size: 13px; font-weight: 700; letter-spacing: .5px; color: #fff; background: rgba(124,58,237,.85); padding: 6px 14px; border-radius: 20px; opacity: 0; transition: opacity .3s; pointer-events: none; }
 
 #bubbles { position: fixed; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; }
+#nametags { position: fixed; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; }
+.nametag { position: absolute; transform: translate(-50%, -100%); background: rgba(10,6,24,.75); color: #fff; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.25); white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .bubble { position: absolute; transform: translate(-50%, -100%); max-width: 220px; background: #fff; color: #1f2937; font-size: 13px; line-height: 1.35; padding: 7px 11px; border-radius: 14px; border-bottom-left-radius: 4px; box-shadow: 0 6px 18px rgba(0,0,0,.35); white-space: normal; }
 .bubble b { color: #7c3aed; }
 .bubble::after { content: ""; position: absolute; left: 14px; bottom: -6px; border: 6px solid transparent; border-top-color: #fff; border-bottom: 0; }

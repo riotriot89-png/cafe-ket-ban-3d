@@ -307,12 +307,13 @@ function advanceSharedTv() {
 /* ============ SCENE ============ */
 const container = $('scene-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x14102b);
+scene.background = null; // nền trong suốt để lớp tivi (CSS3D, nằm dưới canvas WebGL) hiện qua lỗ màn hình
 scene.fog = new THREE.Fog(0x14102b, 45, 90);
 
 const camera = new THREE.PerspectiveCamera(IS_MOBILE && IS_PORTRAIT ? 68 : 55, innerWidth / innerHeight, 0.1, 200);
 camera.position.set(0, IS_MOBILE ? 12 : 15, IS_MOBILE ? 19 : 24);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setClearColor(0x000000, 0); // canvas trong suốt: tivi nằm dưới vẫn hiện qua lỗ màn hình
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(LOWFX ? 1 : Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = !LOWFX;
@@ -330,14 +331,16 @@ controls.minAzimuthAngle = -1.35;
 controls.maxAzimuthAngle = 1.35;
 controls.update();
 
-// Renderer CSS3D: chiếu video YouTube thật lên màn hình tivi trong game
+// Renderer CSS3D: chiếu video YouTube thật lên màn hình tivi trong game.
+// Đặt lớp CSS3D (video) NẰM DƯỚI canvas WebGL để nhân vật 3D đứng trước tivi
+// thì che được video (nhân vật ở trên, màn hình ở dưới), thay vì video đè mất nhân vật.
 const cssRenderer = new CSS3DRenderer();
 cssRenderer.setSize(innerWidth, innerHeight);
 cssRenderer.domElement.style.position = 'absolute';
 cssRenderer.domElement.style.top = '0';
 cssRenderer.domElement.style.left = '0';
 cssRenderer.domElement.style.pointerEvents = 'none';
-container.appendChild(cssRenderer.domElement);
+container.insertBefore(cssRenderer.domElement, renderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x3a2a1e, 0.85));
 const sun = new THREE.DirectionalLight(0xffe7c2, 1.6);
@@ -445,7 +448,10 @@ const tvCtx = tvCanvas.getContext('2d');
 const tvTexture = new THREE.CanvasTexture(tvCanvas);
 const tvScreen = new THREE.Mesh(
   new THREE.PlaneGeometry(12, 6.75),
-  new THREE.MeshBasicMaterial({ map: tvTexture })
+  // "Lỗ" màn hình: chỉ ghi depth để che tường sau, không vẽ màu nên canvas trong suốt
+  // ở đây và video YouTube (lớp CSS3D nằm dưới canvas) hiện qua; nhân vật 3D đứng
+  // trước tivi sẽ vẽ đè lên video vì canvas WebGL nằm trên lớp CSS3D
+  new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true })
 );
 tvScreen.position.set(0, 3.4, -9.7); tvScreen.userData.isTV = true; scene.add(tvScreen);
 const tvFrame = box(12.4, 7.15, 0.12, MAT.black, 0, 3.4, -9.78); scene.add(tvFrame);
@@ -488,7 +494,7 @@ tv3dFrame.allow = 'autoplay; encrypted-media; picture-in-picture';
 tv3dFrame.allowFullscreen = true;
 tv3dEl.appendChild(tv3dFrame);
 const tv3dObj = new CSS3DObject(tv3dEl);
-tv3dObj.position.set(0, 3.4, -9.64);
+tv3dObj.position.set(0, 3.4, -9.7); // trùng đúng mặt phẳng lỗ màn hình để video khớp khung
 tv3dObj.scale.set(0.01, 0.01, 0.01);
 tv3dObj.visible = true; // tivi luôn bật
 scene.add(tv3dObj);
@@ -605,11 +611,23 @@ function toggleMyMute() {
   applyVolume();
 }
 // Chuyển tab quay lại thì phát tiếp + bật lại tiếng theo mức của mình
+// + bù thời gian đã trôi qua để nhân vật đi tiếp (không đứng yên khi tab ra ngoài)
+let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && ytPlayerReady) {
+  if (document.hidden) { hiddenAt = performance.now(); return; }
+  if (ytPlayerReady) {
     ytPlayer.playVideo();
     applyVolume();
   }
+  if (!hiddenAt || !state.entered) return;
+  const elapsed = Math.min((performance.now() - hiddenAt) / 1000, 15); // tối đa 15s
+  hiddenAt = 0;
+  const me = state.players.get('me');
+  if (!me) return;
+  // Mô phỏng lại thời gian đã trôi qua để nhân vật đi tiếp tới nơi (đi bộ, uống)
+  const t0 = performance.now() / 1000;
+  for (let s = 0; s < elapsed; s += 0.05) updateCharacter(me, 0.05, t0 + s);
+  publishMe(true); // gửi vị trí mới lên Firebase ngay để người khác thấy mình đã tới nơi
 });
 
 /* ---- Hàng chờ video: hết video này thì tới video người sau ---- */
@@ -1105,7 +1123,7 @@ function spawnCharacter(id, name, spec, opts = {}) {
     id, name, spec, ...built,
     mode: 'idle', path: [], pendingSeat: null, seat: null,
     speed: 2.3 + Math.random() * 0.5, walkPhase: Math.random() * 10,
-    drink: 0, drinkTimer: 0, bubbleUntil: 0, bubbleEl: null,
+    drink: 0, drinkTimer: 0, bubbleUntil: 0, bubbleEl: null, nameEl: null,
     isRemote: false, tx: null, tz: null, trotY: null, _lastMsg: null, _shownMsgAt: 0, _lastDrink: 0,
     pose: { thighL: 0, thighR: 0, shinL: 0, shinR: 0, shL: 0, shR: 0, foreL: 0, foreR: 0, rigY: 0, headX: 0, headY: 0 },
     poseTarget: { thighL: 0, thighR: 0, shinL: 0.08, shinR: 0.08, shL: 0.06, shR: 0.06, foreL: -0.1, foreR: -0.1, rigY: 0, headX: 0, headY: 0 },
@@ -1113,6 +1131,11 @@ function spawnCharacter(id, name, spec, opts = {}) {
   c.group.position.set(opts.x ?? 0, 0, opts.z ?? 15.5);
   c.group.rotation.y = opts.rotY ?? Math.PI;
   scene.add(c.group);
+  // Tên trên đầu nhân vật (như game)
+  const tag = document.createElement('div');
+  tag.className = 'nametag'; tag.textContent = name;
+  $('nametags').appendChild(tag);
+  c.nameEl = tag;
   c.group.traverse((o) => { if (o.isMesh) { o.userData.charId = id; clickable.push(o); } });
   state.players.set(id, c);
   if (opts.seat) sitDown(c, opts.seat, true);
@@ -1449,7 +1472,6 @@ function setVideo(id, title) {
   if (!loadIntoPlayer(ytPanelPlayer, id)) $('tv-frame').src = panelUrl(id);
   if (ytPlayerReady) { ytPlayer.loadVideoById(id); loadedVideoId = id; applyVolume(); setTimeout(() => captionsOff(ytPlayer), 600); }
   else if (tv3dFrame.getAttribute('src') !== tv3dUrl()) tv3dFrame.src = tv3dUrl();
-  drawTV(0);
 }
 function openTV() { $('tv-panel').classList.remove('hidden'); createPanelPlayer(); }
 $('btn-tv').addEventListener('click', openTV);
@@ -1580,6 +1602,7 @@ function removeCharacter(id) {
   if (!c) return;
   if (c.seat) freeSeat(c.seat);
   if (c.bubbleEl) c.bubbleEl.remove();
+  if (c.nameEl) c.nameEl.remove();
   scene.remove(c.group);
   for (let i = clickable.length - 1; i >= 0; i--) {
     if (clickable[i].userData.charId === id) clickable.splice(i, 1);
@@ -1726,14 +1749,30 @@ function animate() {
     if (me && me.mode === 'walk') publishMe();
   }
   tvTimer += dt;
-  if (tvTimer > 0.12) { tvTimer = 0; drawTV(t); }
-  // Bong bóng chat bám theo đầu nhân vật 3D
+  // Tên + bong bóng chat bám theo đầu nhân vật 3D (tên ở trên đầu, bong bóng ở trên tên)
   for (const c of state.players.values()) {
+    const fade = c._fade ?? 1;
+    // Tên trên đầu
+    if (c.nameEl) {
+      if (state.camMode === 3 && c.id === 'me') { c.nameEl.style.display = 'none'; }
+      else {
+        c.parts.head.getWorldPosition(_pv);
+        _pv.y += 0.45;
+        _pv.project(camera);
+        if (_pv.z > 1) { c.nameEl.style.display = 'none'; }
+        else {
+          c.nameEl.style.display = 'block';
+          c.nameEl.style.opacity = fade;
+          c.nameEl.style.left = ((_pv.x * 0.5 + 0.5) * innerWidth) + 'px';
+          c.nameEl.style.top = ((-_pv.y * 0.5 + 0.5) * innerHeight) + 'px';
+        }
+      }
+    }
     if (!c.bubbleEl) continue;
     // Góc nhìn thứ nhất: bong bóng của chính mình ở ngay trước mắt nên ẩn đi
     if (state.camMode === 3 && c.id === 'me') { c.bubbleEl.style.display = 'none'; continue; }
     c.parts.head.getWorldPosition(_pv);
-    _pv.y += 0.4;
+    _pv.y += 0.95;
     _pv.project(camera);
     if (_pv.z > 1) { c.bubbleEl.style.display = 'none'; continue; }
     c.bubbleEl.style.display = 'block';

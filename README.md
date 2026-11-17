@@ -7,9 +7,16 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
 
 - **Quán 3D kiểu gaming**: sàn gỗ, tường neon, bảng hiệu phát sáng, quầy bar,
   sân vườn có dây đèn, góc lounge có sofa và thảm.
-- **100 ghế** chia 3 khu: Sảnh chính (48 ghế), Sân vườn (32 ghế), Lounge (20 ghế).
-  Mỗi bàn tròn to (r 0,78) có 4 ghế xếp ở nửa dưới (phía nam) của bàn, tất cả hướng mặt
-  lên trên về phía tivi — ngồi xuống là quay mặt ra bàn và nhìn lên tivi.
+- **Tên trên đầu mỗi nhân vật** (như game): tên hiện ngay trên đầu, bong bóng chat ở trên tên.
+- **Tab ra ngoài nhân vật vẫn đi tiếp**: trình duyệt dừng vòng lặp khi tab ẩn nên nhân vật
+  đứng yên — khi quay lại tab, quán mô phỏng bù thời gian đã trôi qua (tối đa 15s) để
+  nhân vật đi tiếp tới nơi / uống xong, rồi gửi vị trí mới lên Firebase ngay. Nhịp tim
+  15s vẫn chạy khi tab ẩn nên người khác không tưởng mình đã thoát; chỉ khi đóng hẳn
+  tab (onDisconnect) mới tính là rời quán.
+- **Tivi nằm dưới nhân vật**: lớp video CSS3D giờ nằm dưới canvas WebGL, màn hình tivi
+  trong cảnh 3D là một "lỗ" chỉ ghi depth (không vẽ màu) nên video hiện qua lỗ đó; nhân
+  vật 3D đứng trước tivi sẽ vẽ đè lên video (nhân vật che màn hình, không còn bị video
+  đè mất đầu).
 - **Nhân vật 3D chibi thời trang, cao ~1,7**: chỉ 2 nhân vật — **Milo (nam)**: bộ Street
   (snapback đen vành đỏ có logo, hoodie kem túi kangaroo đỏ, quần cargo rêu có túi hộp,
   giày sneaker trắng đế đỏ); **Luna (nữ)**: bộ Chic (mũ beret hồng, nơ hồng, tóc dài mái ngang,
