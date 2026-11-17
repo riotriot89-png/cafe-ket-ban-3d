@@ -58,12 +58,17 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   gradient có tia hướng tâm, tóc nhiều lớp có highlight, váy 2 lớp. **Không khí**: chùm sáng ấm dưới đèn treo,
   bụi bay lơ lửng, viền tối điện ảnh (vignette). Trần tự ẩn khi camera ở trên cao
   (góc toàn cảnh) để khỏi che tầm nhìn.
-- **Tủ đồ (8 bộ)**: mỗi nhân vật có 4 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy
+- **Tủ đồ (10 bộ)**: mỗi nhân vật có 5 bộ, chọn ở màn chào, đồng bộ cho mọi người thấy
   qua Firebase. Milo: Street, Denim (áo khoác jean + quần jean + tóc ngắn), Thể thao
-  (băng đô + tóc xoăn + áo cam + quần đùi), Mùa đông (mũ len + áo len cổ lọ + bốt).
+  (băng đô + tóc xoăn + áo cam + quần đùi), Mùa đông (mũ len + áo len cổ lọ + bốt),
+  **Hắc Ám** (áo khoác denim đen + quần cargo đen + bốt đen + hình xăm tribal quấn cẳng tay).
   Luna: Chic, Denim (tóc bob + áo khoác jean + quần jean), Mùa hè (mũ rộng vành + tóc đuôi
-  ngựa + váy liền vàng + dép), Mùa đông (mũ len hồng + tóc búi + áo len + legging + bốt).
-  Đổi bộ đồ giữa chừng thì người khác cũng thấy nhân vật dựng lại theo bộ mới.
+  ngựa + váy liền vàng + dép), Mùa đông (mũ len hồng + tóc búi + áo len + legging + bốt),
+  **Trắng** (váy trắng thắt lưng đen + tất trắng + giày đen).
+  2 bộ Hắc Ám/Trắng học theo pack `14_power_couples.zip` người dùng gửi (phong cách dark/
+  gothic: đồ đen, váy trắng, hình xăm, dây xích) — pack gốc là sprite 2D 444×700 (mỗi món
+  1 lớp PNG trong suốt, có cả bản đen trắng để tô màu lại), đã chuyển thành đồ 3D theo
+  hệ OUTFITS. Đổi bộ đồ giữa chừng thì người khác cũng thấy nhân vật dựng lại theo bộ mới.
 - **Chat bong bóng 3D**: bong bóng bám theo đầu nhân vật, kèm log chat.
 - **Tivi YouTube**: màn hình lớn trên tường (luôn bật, không bấm tương tác được). Video chiếu thật lên màn hình tivi 3D trong game (CSS3DRenderer), tự tắt phụ đề và thanh điều khiển. Dán link YouTube để thêm vào hàng chờ chung cả quán — hết video này tự phát video người sau. Âm thanh chỉnh riêng từng người (nút loa trên thanh trên cùng + thanh trượt trong bảng tivi).
 - **Kết bạn**: bấm vào người khác để xem hồ sơ, chào và kết bạn (lưu localStorage).
@@ -73,10 +78,10 @@ tivi và nhân vật đều là mô hình 3D, nhân vật đi lại, ngồi, nâ
   bình thường.
 - **Di chuyển tự do (2026-11-17)**: trên máy tính bấm **WASD** (hoặc phím mũi tên) để đi,
   hướng đi theo camera (W = xa camera, A/D = trái/phải); trên điện thoại kéo **joystick**
-  tròn ở góc trái dưới. Nhân vật đi bộ có hoạt ảnh chân tay, không xuyên qua bàn/quầy/
-  sofa (va chạm tròn quanh bàn + hình chữ nhật quanh quầy bar và sofa, đi chéo bị kẹt
-  thì tự trượt dọc theo mép bàn), không ra khỏi quán. Đang ngồi mà bấm di chuyển thì
-  tự đứng dậy rồi đi. Bấm vào sàn vẫn đi tới điểm đó như trước.
+  tròn ở góc trái dưới. Nhân vật đi bộ có hoạt ảnh chân tay. **Đi tự do, không va chạm**:
+  xuyên bàn ghế/quầy/sofa thoải mái, không bao giờ bị kẹt; chỉ còn tường quán là ranh
+  giới để khỏi rơi ra ngoài sàn. Đang ngồi mà bấm di chuyển thì tự đứng dậy rồi đi.
+  Bấm vào sàn vẫn đi tới điểm đó như trước.
 - **Ngồi bằng nút (2026-11-17)**: không cần bấm vào ghế nữa — lại gần ghế trống (trong
   1,8m) thì nút **🪑 Ngồi xuống** hiện ở giữa dưới màn hình, bấm là nhân vật đi tới ngồi
   vào ghế gần nhất; đang ngồi thì nút đổi thành **🚶 Đứng dậy**. Bấm vào ghế vẫn ngồi

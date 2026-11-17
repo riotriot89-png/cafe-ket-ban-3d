@@ -48,6 +48,14 @@ const OUTFITS = {
       bottom: { type: 'jeans', main: 0x374151 },
       shoes: { type: 'boots', main: 0x78350f, sole: 0x451a03 },
     },
+    dark: {
+      label: 'Hắc Ám',
+      hair: { type: 'spiky' },
+      top: { type: 'denim', main: 0x1f2937, pocket: 0x111827 },
+      bottom: { type: 'cargo', main: 0x111827, pocket: 0x1f2937 },
+      shoes: { type: 'boots', main: 0x111827, sole: 0x000000 },
+      tattoo: { main: 0x111827 },
+    },
   },
   female: {
     chic: {
@@ -81,6 +89,13 @@ const OUTFITS = {
       top: { type: 'sweater', main: 0xdb2777 },
       bottom: { type: 'leggings', main: 0x111827 },
       shoes: { type: 'boots', main: 0x78350f, sole: 0x451a03 },
+    },
+    white: {
+      label: 'Trắng',
+      hair: { type: 'long' },
+      top: { type: 'dress', main: 0xf5f5f4, belt: 0x111827 },
+      bottom: { type: 'dress', main: 0xf5f5f4 },
+      shoes: { type: 'maryjane', main: 0x111827 },
     },
   },
 };
@@ -1201,28 +1216,6 @@ HALL_X.forEach((x) => HALL_Z.forEach((z) => makeTable(x, z, 'hall')));
 const TERR_Z = [8.5, 12.5];
 HALL_X.forEach((x) => TERR_Z.forEach((z) => makeTable(x, z, 'terrace')));
 [[-13, -4], [-13, 4], [13, -4], [13, 0], [13, 4]].forEach(([x, z]) => makeTable(x, z, 'lounge'));
-// Vật cản khi di chuyển tự do (WASD/joystick): 25 bàn tròn + quầy bar + sofa lounge
-const TABLE_POS = [];
-HALL_X.forEach((x) => HALL_Z.forEach((z) => TABLE_POS.push([x, z])));
-HALL_X.forEach((x) => TERR_Z.forEach((z) => TABLE_POS.push([x, z])));
-[[-13, -4], [-13, 4], [13, -4], [13, 0], [13, 4]].forEach(([x, z]) => TABLE_POS.push([x, z]));
-const OBSTACLES = [
-  { x0: 12.9, x1: 16.3, z0: -8.85, z1: -2.15 }, // quầy bar
-  { x0: -15.9, x1: -14.5, z0: -2.9, z1: -0.1 }, // sofa trái trên
-  { x0: -15.9, x1: -14.5, z0: 0.1, z1: 2.9 }, // sofa trái dưới
-  { x0: 14.5, x1: 15.9, z0: -2.9, z1: -0.1 }, // sofa phải trên
-];
-function blocked(x, z) {
-  for (const [tx, tz] of TABLE_POS) {
-    const dx = x - tx, dz = z - tz;
-    if (dx * dx + dz * dz < 1.0) return true; // bàn r 0.78 + người ~0.2
-  }
-  for (const o of OBSTACLES) {
-    if (x > o.x0 && x < o.x1 && z > o.z0 && z < o.z1) return true;
-  }
-  if (x < -16.5 || x > 16.5 || z < -9.5 || z > 16.5) return true; // tường quán
-  return false;
-}
 // Thảm lounge
 [[-13, -4], [-13, 4], [13, -4], [13, 0], [13, 4]].forEach(([x, z], i) => {
   const rug = new THREE.Mesh(new THREE.CircleGeometry(2.1, 32), new THREE.MeshStandardMaterial({ map: rugTexture(i % 2 ? '#0369a1' : '#be185d', i % 2 ? '#bae6fd' : '#f9a8d4'), roughness: 1 }));
@@ -1673,6 +1666,11 @@ function buildCharacter(spec) {
     const um = new THREE.Mesh(SHARED_GEO.upperArm, shirt); um.castShadow = true; upper.add(um);
     const fore = new THREE.Group(); fore.position.set(0, -0.3, 0); upper.add(fore);
     const fm = new THREE.Mesh(SHARED_GEO.foreArm, skin); fm.castShadow = true; fore.add(fm);
+    // Hình xăm tribal quấn cẳng tay (pack 14_power_couples: tattoo rồng/hoa/văn)
+    if (outfit.tattoo) {
+      const tat = new THREE.Mesh(new THREE.CylinderGeometry(0.041, 0.038, 0.09, 10), toonMat(outfit.tattoo.main ?? 0x111827));
+      tat.position.y = -0.14; tat.castShadow = true; fore.add(tat);
+    }
     const hand = new THREE.Mesh(SHARED_GEO.hand, skin); hand.position.set(0, -0.28, 0); hand.castShadow = true; fore.add(hand);
     const thumb = new THREE.Mesh(SHARED_GEO.thumb, skin); thumb.position.set(-0.04 * side, -0.27, 0.025); fore.add(thumb);
     return { upper, fore };
@@ -1895,14 +1893,12 @@ function updateCharacter(c, dt, t) {
     pt.rigY = Math.abs(Math.cos(c.walkPhase)) * 0.045;
     pt.headX = 0; pt.headY = 0;
   } else if (c.mode === 'free' && c.moveDir) {
-    // Di chuyển tự do (WASD / joystick): đi thẳng theo hướng nhập, có va chạm
+    // Di chuyển tự do (WASD / joystick): đi thẳng theo hướng nhập,
+    // không va chạm gì cả — xuyên bàn ghế thoải mái, chỉ kẹp trong tường quán
+    // để khỏi rơi ra ngoài sàn
     const step = c.speed * dt;
-    const nx = c.group.position.x + c.moveDir.x * step;
-    const nz = c.group.position.z + c.moveDir.z * step;
-    // Va chạm: thử đi chéo, nếu kẹt thì trượt dọc theo 1 trục (đi men theo bàn)
-    if (!blocked(nx, nz)) { c.group.position.x = nx; c.group.position.z = nz; }
-    else if (!blocked(nx, c.group.position.z)) { c.group.position.x = nx; }
-    else if (!blocked(c.group.position.x, nz)) { c.group.position.z = nz; }
+    c.group.position.x = Math.max(-16.5, Math.min(16.5, c.group.position.x + c.moveDir.x * step));
+    c.group.position.z = Math.max(-9.5, Math.min(16.5, c.group.position.z + c.moveDir.z * step));
     const targetRot = Math.atan2(c.moveDir.x, c.moveDir.z);
     let dr = targetRot - c.group.rotation.y;
     while (dr > Math.PI) dr -= Math.PI * 2;
