@@ -32,7 +32,7 @@ import {
   staffEffects,
 } from "./shared";
 import { advanceMarket, marketSnapshot, tickIndex, weatherAt, type MarketState } from "./market";
-import { getMarketState, getPlayer, listPlayers, saveMarketState, savePlayer } from "./store";
+import { getMarketState, getPlayer, listPlayers, saveMarketState, savePlayer, storeGet, storeSet } from "./store";
 import { clamp, currentSeason, seededNoise, uid } from "./util";
 import type {
   GameEvent,
@@ -608,9 +608,24 @@ export async function shopAction(
 }
 
 // ---------- Bảng xếp hạng ----------
+// Cache 10 giây: bảng xếp hạng chỉ tính lại tối đa 1 lần / 10s thay vì đọc hết
+// người chơi mỗi lần có người hỏi state — tiết kiệm rất nhiều lượt gọi Redis.
+const LB_CACHE_TTL_MS = 10_000;
+
 export async function getLeaderboard(): Promise<{ season: { id: string; endsAt: number }; entries: LeaderboardEntry[] }> {
   const now = Date.now();
   const season = currentSeason(now);
+  try {
+    const raw = await storeGet("leaderboard:cache");
+    if (raw) {
+      const cached = JSON.parse(raw) as { at: number; seasonId: string; entries: LeaderboardEntry[] };
+      if (cached.seasonId === season.id && now - cached.at < LB_CACHE_TTL_MS) {
+        return { season, entries: cached.entries };
+      }
+    }
+  } catch {
+    // Cache hỏng thì tính lại như thường.
+  }
   const players = await listPlayers();
   const entries: LeaderboardEntry[] = players
     .map((p) => {
@@ -628,5 +643,6 @@ export async function getLeaderboard(): Promise<{ season: { id: string; endsAt: 
     })
     .sort((a, b) => b.seasonScore - a.seasonScore || b.netWorth - a.netWorth)
     .slice(0, 20);
+  await storeSet("leaderboard:cache", JSON.stringify({ at: now, seasonId: season.id, entries }));
   return { season, entries };
 }

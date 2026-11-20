@@ -55,6 +55,11 @@ export default function Home() {
   );
   const [nameInput, setNameInput] = useState<string>(() => CUTE_NAMES[Math.floor(Math.random() * CUTE_NAMES.length)]);
   const [editingName, setEditingName] = useState(false);
+  const [authTab, setAuthTab] = useState<"guest" | "register" | "login">("guest");
+  const [accountUser, setAccountUser] = useState<string | null>(null);
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [authError, setAuthError] = useState("");
   const seenEvents = useRef<Set<string>>(new Set());
   const playerIdRef = useRef<string | null>(null);
   const soundRef = useRef(true);
@@ -104,15 +109,30 @@ export default function Home() {
       playerIdRef.current = savedId;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Tải state lần đầu từ server cho id đã lưu ở localStorage: đồng bộ với hệ thống ngoài khi mount, đúng mục đích của effect.
       void refresh(savedId);
+      return;
     }
+    // Chưa có nick khách: thử session tài khoản (đăng nhập từ lần trước) để vào sạp luôn.
+    void (async () => {
+      const me = await api.me();
+      if (me) {
+        localStorage.setItem("tmcc_player_id", me.id);
+        localStorage.setItem("tmcc_nickname", me.nickname);
+        playerIdRef.current = me.id;
+        setPlayerId(me.id);
+        if (me.username) setAccountUser(me.username);
+        setShowNameModal(false);
+        void refresh(me.id);
+      }
+    })();
   }, [refresh]);
 
-  // Poll state mỗi 5s + đồng hồ đếm ngược mỗi 1s
+  // Poll state mỗi 10s (giá chợ đổi mỗi 10s nên hỏi nhanh hơn cũng không có gì mới)
+  // + đồng hồ đếm ngược mỗi 1s
   useEffect(() => {
     if (!playerId) return;
     const iv = window.setInterval(() => {
       if (playerIdRef.current) void refresh(playerIdRef.current);
-    }, 5000);
+    }, 10000);
     return () => window.clearInterval(iv);
   }, [playerId, refresh]);
 
@@ -122,6 +142,11 @@ export default function Home() {
   }, []);
 
   const joinGame = async () => {
+    // Đã vào sạp rồi mà mở lại modal thì chỉ đóng modal, không tạo nick mới.
+    if (playerIdRef.current) {
+      setShowNameModal(false);
+      return;
+    }
     const name = nameInput.trim() || CUTE_NAMES[Math.floor(Math.random() * CUTE_NAMES.length)];
     setBusy(true);
     try {
@@ -138,6 +163,74 @@ export default function Home() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const enterWithAccount = (username: string, playerId: string, nickname: string) => {
+    localStorage.setItem("tmcc_player_id", playerId);
+    localStorage.setItem("tmcc_nickname", nickname);
+    playerIdRef.current = playerId;
+    setPlayerId(playerId);
+    setAccountUser(username);
+    setShowNameModal(false);
+  };
+
+  const doRegister = async () => {
+    const username = usernameInput.trim();
+    if (!username || !passwordInput) {
+      setAuthError("Nhập đủ tên tài khoản và mật khẩu nha.");
+      return;
+    }
+    setBusy(true);
+    setAuthError("");
+    try {
+      // Đang chơi khách thì tài khoản mới giữ luôn tiến trình của nick khách đó.
+      const linkId = localStorage.getItem("tmcc_player_id") ?? undefined;
+      const res = await api.register(username, passwordInput, nameInput.trim() || undefined, linkId);
+      enterWithAccount(res.username, res.player.id, res.player.nickname);
+      pushToast(`Tạo tài khoản xong rồi, chào ${res.player.nickname}! Tiến trình giữ mãi mãi, đổi máy vẫn chơi tiếp nha ^w^`, "good", "quest");
+      await refresh(res.player.id);
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : "Không tạo được tài khoản.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doLogin = async () => {
+    const username = usernameInput.trim();
+    if (!username || !passwordInput) {
+      setAuthError("Nhập đủ tên tài khoản và mật khẩu nha.");
+      return;
+    }
+    setBusy(true);
+    setAuthError("");
+    try {
+      const res = await api.login(username, passwordInput);
+      enterWithAccount(res.username, res.player.id, res.player.nickname);
+      pushToast(`Chào mừng trở lại, ${res.player.nickname}! ^w^`, "good", "quest");
+      await refresh(res.player.id);
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : "Không đăng nhập được.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doLogout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Mất mạng thì vẫn đăng xuất ở máy mình.
+    }
+    localStorage.removeItem("tmcc_player_id");
+    localStorage.removeItem("tmcc_nickname");
+    playerIdRef.current = null;
+    setPlayerId(null);
+    setState(null);
+    setAccountUser(null);
+    setAuthTab("guest");
+    setShowNameModal(true);
+    pushToast("Đã đăng xuất, hẹn gặp lại nha!", "info");
   };
 
   const act = async <T,>(fn: () => Promise<T>, okSound: SoundKind = "click"): Promise<T | null> => {
@@ -290,6 +383,27 @@ export default function Home() {
               >
                 {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </button>
+              {accountUser ? (
+                <button
+                  onClick={doLogout}
+                  title={`Đang đăng nhập: ${accountUser} — bấm để đăng xuất`}
+                  className="rounded-full border-2 border-violet-200 bg-white px-3 py-1.5 text-xs font-extrabold text-violet-700 shadow-sm transition active:translate-y-0.5"
+                >
+                  @{accountUser} • Đăng xuất
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setAuthTab("register");
+                    setAuthError("");
+                    setShowNameModal(true);
+                  }}
+                  title="Tạo tài khoản để giữ tiến trình mãi mãi, đổi máy vẫn chơi tiếp"
+                  className="rounded-full border-2 border-violet-200 bg-violet-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm transition active:translate-y-0.5"
+                >
+                  Tạo tài khoản
+                </button>
+              )}
             </>
           )}
         </div>
@@ -328,31 +442,110 @@ export default function Home() {
         )}
       </div>
 
-      {/* Modal đặt tên lần đầu */}
+      {/* Modal vào chơi: chơi ngay / tạo tài khoản / đăng nhập */}
       {showNameModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-pink-950/40 p-4">
           <div className="w-full max-w-sm rounded-3xl border-2 border-pink-200 bg-white p-6 text-center shadow-[0_10px_0_rgba(244,114,182,0.25)]">
             <div className="text-5xl">🧺</div>
             <h2 className="mt-2 text-xl font-black text-pink-600">Chào mừng tới Túi Mù Chạy Chợ!</h2>
-            <p className="mt-1 text-sm font-bold text-gray-500">Chơi ngay không cần đăng ký. Đặt cho mình một biệt danh dễ thương nha ^w^</p>
-            <input
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              maxLength={20}
-              placeholder="Biệt danh của bạn..."
-              className="mt-4 w-full rounded-full border-2 border-pink-200 px-4 py-2.5 text-center font-extrabold outline-none focus:border-pink-400"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void joinGame();
-              }}
-            />
-            <button
-              onClick={joinGame}
-              disabled={busy}
-              className="mt-3 w-full rounded-full bg-pink-500 py-3 font-extrabold text-white shadow-[0_5px_0_rgba(190,24,93,0.4)] transition active:translate-y-1 active:shadow-none disabled:opacity-50"
-            >
-              {busy ? "Đang dọn sạp..." : "Vào chợ ngay! UwU"}
-            </button>
-            <p className="mt-2 text-xs font-semibold text-gray-400">Bắt đầu với 1.000 Xu • Tiến trình lưu trên máy bạn</p>
+            <p className="mt-1 text-sm font-bold text-gray-500">
+              {authTab === "guest"
+                ? "Chơi ngay không cần đăng ký. Đặt cho mình một biệt danh dễ thương nha ^w^"
+                : authTab === "register"
+                  ? "Tạo tài khoản để giữ tiến trình mãi mãi, đổi máy vẫn chơi tiếp nha!"
+                  : "Đăng nhập để chơi tiếp sạp hàng của bạn nè!"}
+            </p>
+
+            <div className="mt-4 flex gap-2">
+              {(
+                [
+                  ["guest", "Chơi ngay"],
+                  ["register", "Tạo tài khoản"],
+                  ["login", "Đăng nhập"],
+                ] as const
+              ).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    setAuthTab(tab);
+                    setAuthError("");
+                  }}
+                  className={`flex-1 rounded-full py-2 text-xs font-extrabold transition ${
+                    authTab === tab ? "bg-pink-500 text-white shadow-[0_3px_0_rgba(190,24,93,0.4)]" : "bg-pink-50 text-pink-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {authTab === "guest" ? (
+              <>
+                <input
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  maxLength={20}
+                  placeholder="Biệt danh của bạn..."
+                  className="mt-4 w-full rounded-full border-2 border-pink-200 px-4 py-2.5 text-center font-extrabold outline-none focus:border-pink-400"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void joinGame();
+                  }}
+                />
+                <button
+                  onClick={joinGame}
+                  disabled={busy}
+                  className="mt-3 w-full rounded-full bg-pink-500 py-3 font-extrabold text-white shadow-[0_5px_0_rgba(190,24,93,0.4)] transition active:translate-y-1 active:shadow-none disabled:opacity-50"
+                >
+                  {busy ? "Đang dọn sạp..." : "Vào chợ ngay! UwU"}
+                </button>
+                <p className="mt-2 text-xs font-semibold text-gray-400">Bắt đầu với 1.000 Xu • Tiến trình lưu trên máy bạn</p>
+              </>
+            ) : (
+              <>
+                <input
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  maxLength={20}
+                  placeholder="Tên tài khoản (vd: beo_2009)"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  className="mt-4 w-full rounded-full border-2 border-pink-200 px-4 py-2.5 text-center font-extrabold outline-none focus:border-pink-400"
+                />
+                <input
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  type="password"
+                  maxLength={64}
+                  placeholder="Mật khẩu (từ 6 ký tự)"
+                  className="mt-3 w-full rounded-full border-2 border-pink-200 px-4 py-2.5 text-center font-extrabold outline-none focus:border-pink-400"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void (authTab === "register" ? doRegister() : doLogin());
+                  }}
+                />
+                {authTab === "register" && (
+                  <input
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    maxLength={20}
+                    placeholder="Biệt danh trong chợ..."
+                    className="mt-3 w-full rounded-full border-2 border-pink-200 px-4 py-2.5 text-center font-extrabold outline-none focus:border-pink-400"
+                  />
+                )}
+                {authError && <p className="mt-3 text-sm font-bold text-rose-600">{authError}</p>}
+                <button
+                  onClick={() => void (authTab === "register" ? doRegister() : doLogin())}
+                  disabled={busy}
+                  className="mt-3 w-full rounded-full bg-pink-500 py-3 font-extrabold text-white shadow-[0_5px_0_rgba(190,24,93,0.4)] transition active:translate-y-1 active:shadow-none disabled:opacity-50"
+                >
+                  {busy ? "Đang xử lý..." : authTab === "register" ? "Tạo tài khoản! UwU" : "Đăng nhập! UwU"}
+                </button>
+                <p className="mt-2 text-xs font-semibold text-gray-400">
+                  {authTab === "register"
+                    ? "Đang chơi khách thì tài khoản mới giữ luôn Xu và đồ của bạn."
+                    : "Quên mật khẩu thì tạo tài khoản mới nha, hiện chưa có khôi phục."}
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}

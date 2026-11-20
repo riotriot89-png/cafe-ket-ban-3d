@@ -63,4 +63,34 @@ export const api = {
       body: JSON.stringify({ playerId, action, shopId }),
     });
   },
+  async register(username: string, password: string, nickname?: string, linkPlayerId?: string) {
+    return call<{ player: { id: string; nickname: string }; username: string }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ username, password, nickname, linkPlayerId }),
+    });
+  },
+  async login(username: string, password: string) {
+    return call<{ player: { id: string; nickname: string }; username: string }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+  },
+  async logout() {
+    return call<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
+  },
+  // Trả về null khi chưa đăng nhập (không ném lỗi như các API khác).
+  async me() {
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = (await res.json()) as {
+        ok: boolean;
+        player?: { id: string; nickname: string };
+        username?: string | null;
+      };
+      if (!data.ok || !data.player) return null;
+      return { ...data.player, username: data.username ?? null };
+    } catch {
+      return null;
+    }
+  },
 };
