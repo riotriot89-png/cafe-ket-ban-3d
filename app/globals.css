@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #fffbf5;
+  color: #1f2937;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #fbcfe8;
+}

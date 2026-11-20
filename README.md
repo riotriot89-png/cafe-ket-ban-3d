@@ -1,101 +1,81 @@
-# Tạo Ảnh với Muse 🎨
+# 🧺 TÚI MÙ CHẠY CHỢ
 
-Tool tạo ảnh chạy trên web, không cần API key, không có server riêng.
-Người dùng gõ mô tả trên web → yêu cầu được ghi lên Firebase Realtime
-Database → Muse kiểm tra định kỳ, tạo ảnh rồi ghi ảnh trả lại lên
-Firebase → web tự hiện ảnh.
+Game buôn bán / chạy hàng multiplayer thời gian thực, phong cách **Cozy Cute / Pastel Pop**.
+Next.js (App Router) + TypeScript + Tailwind CSS + lucide-react. Không cần đăng ký — chơi ngay bằng biệt danh Guest.
 
-> Web này đã **thay thế hoàn toàn quán cà phê 3D cũ** (người dùng chốt xóa
-> quán ngày 2026-11-20). Không còn Three.js, nhân vật GLB, tivi YouTube,
-> service worker/PWA của quán cũ. Code mới chỉ dùng Firebase SDK tự chứa
-> trong `vendor/`. Khi tải trang, app.js mới tự hủy đăng ký service worker
-> cũ nếu trình duyệt còn giữ, để không phục vụ bản quán cũ từ cache.
+## Chạy local
 
-## Cách chạy
-
-- Deploy: push repo lên GitHub, Vercel tự deploy (đã nối sẵn, domain
-  `cafenha.vercel.app`). `vercel.json` giữ nguyên.
-- Chạy local: `python3 -m http.server 8003` trong thư mục này, mở
-  `http://localhost:8003`.
-
-## Vòng lặp hoạt động
-
-```
-Web (người dùng)                Firebase RTDB                 Muse (người)
-  gõ mô tả, chọn              image-tool/requests/{id}       kiểm tra định kỳ
-  phong cách, tỉ lệ   ---->    { type, prompt, style,          (cron riêng)
-  bấm "Tạo ảnh"                size, imageData?,               |
-                               status: "pending",              v
-                               createdAt }               tạo ảnh, ghi thêm
-  danh sách tự cập nhật  <---- { status: "done"|"error",       vào cùng node:
-  khi có ảnh mới               imageResult?, error?,       status, imageResult,
-                               doneAt }                     doneAt / error
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # build production
+npm start        # chạy production
 ```
 
-- Mỗi ảnh chờ vài phút (không tức thì như gọi API trực tiếp).
-- Chỉ cần để trang mở, ảnh xong sẽ tự hiện trong danh sách.
+## Biến môi trường (không bắt buộc)
 
-## Dữ liệu Firebase
+| Biến | Mô tả |
+| --- | --- |
+| `UPSTASH_REDIS_REST_URL` | URL REST của Upstash Redis (nếu có) |
+| `UPSTASH_REDIS_REST_TOKEN` | Token REST của Upstash Redis (nếu có) |
 
-Project giữ nguyên project cũ của quán: **`cafe-ket-ban`**
-(Singapore, Spark miễn phí), database
-`https://cafe-ket-ban-default-rtdb.asia-southeast1.firebasedatabase.app`.
-Config đầy đủ nằm trong `app.js` (FIREBASE_CONFIG).
+Không cấu hình Redis thì game tự dùng **In-Memory Store** — chạy ngay, dữ liệu chỉ mất khi restart server.
 
-### Request — `image-tool/requests/{pushId}` (web ghi lúc tạo)
+## Deploy (Vercel)
 
-| Field | Kiểu | Ghi chú |
-|---|---|---|
-| `type` | string | `"generate"` (tạo mới) \| `"edit"` (chỉnh ảnh có sẵn) |
-| `prompt` | string | Mô tả, tối đa 500 ký tự |
-| `style` | string | `"real"` (Ảnh thật) \| `"anime"` \| `"3d"` (Hoạt hình 3D) \| `"painting"` (Tranh vẽ) |
-| `size` | string | `"square"` (1:1) \| `"portrait"` (9:16) \| `"landscape"` (16:9) |
-| `imageData` | string | Chỉ khi `type="edit"`: data URL JPEG của ảnh upload, đã thu nhỏ bằng canvas về tối đa 1024px, chất lượng 0.85 |
-| `status` | string | `"pending"` khi mới tạo |
-| `createdAt` | number | `Date.now()` (ms) |
+Push code lên GitHub rồi Import vào Vercel. Nhớ set 2 biến Upstash ở trên nếu muốn dữ liệu bền vững qua các lần deploy (không set thì leaderboard/state reset mỗi lần serverless cold-start/deploy lại).
 
-### Kết quả — Muse ghi thêm vào cùng node
+## Cách chơi nhanh
 
-| Field | Kiểu | Ghi chú |
-|---|---|---|
-| `status` | string | `"done"` \| `"error"` (trong lúc làm có thể đặt `"processing"` để web hiện "Đang tạo") |
-| `imageResult` | string | Data URL JPEG của ảnh đã tạo/chỉnh xong |
-| `error` | string | Nội dung lỗi (chỉ khi `status="error"`) |
-| `doneAt` | number | `Date.now()` lúc xong |
+1. Vào trang, đặt biệt danh dễ thương → bắt đầu với 1.000 Xu ở Vườn Dâu.
+2. Mua hàng rẻ ở chợ này, chạy sang chợ khác bán đắt. Giá đồng bộ cho cả xóm mỗi 10 giây.
+3. Canh thời tiết (đổi 4 phút/lần) và sự kiện (đổi 3 phút/lần) để mua thấp bán cao.
+4. Bán có lời được EXP, lên cấp mở khóa hàng/xe/nhân viên mới.
+5. Làm nhiệm vụ "Đơn Hàng Xóm Nhỏ" để nhận Xu + EXP + rương quà.
+6. Thuê/mua xe to hơn để chở nhiều, thuê nhân viên để chống trộm, giảm phí, tự chốt lời.
+7. Leo top Bảng Xếp Hạng theo mùa (mỗi tuần làm mới một mùa).
 
-### Web lắng nghe
+## Cấu trúc
 
-`image-tool/requests`, `orderByChild("createdAt")`, `limitToLast(30)`,
-hiển thị mới nhất trước. Mỗi thẻ hiện prompt, thời gian, badge trạng
-thái (Đang chờ / Đang tạo / Xong / Lỗi + nội dung lỗi), ảnh kết quả kèm
-nút "Tải ảnh xuống" khi xong.
+```
+app/
+  page.tsx                 Trang game chính (client)
+  layout.tsx               Font Nunito + metadata
+  globals.css              Tailwind v4 + keyframes marquee
+  api/
+    state/route.ts         GET ?id= — state đầy đủ (player + market + leaderboard)
+    player/route.ts        POST tạo guest • PATCH đổi tên • GET
+    market/route.ts        GET snapshot thị trường
+    trade/route.ts         POST mua/bán
+    travel/route.ts        POST di chuyển
+    quests/route.ts        POST nhận thưởng / đổi đơn
+    garage/route.ts        POST thuê/mua/kích hoạt xe
+    staff/route.ts         POST thuê/tuyển/nâng cấp nhân viên
+    shop/route.ts          POST mua/trang bị danh hiệu & sạp
+    leaderboard/route.ts   GET top 20 theo mùa
+lib/
+  config.ts                Dữ liệu tập trung: 14 món, 4 khu, 6 thời tiết, sự kiện, 8 cấp, 6 xe, 3 nhân viên, nhiệm vụ, shop
+  market.ts                Động cơ giá: seeded noise theo nhịp 10s + cung/cầu + thời tiết/sự kiện
+  store.ts                 Store: Upstash Redis REST (nếu có) + fallback In-Memory
+  game.ts                  Logic server: mua/bán, di chuyển, trộm vặt, kiểm tra hàng, nhiệm vụ, xe, nhân viên, shop, leaderboard
+  shared.ts                Helper thuần dùng chung server + client
+  types.ts                 Kiểu dữ liệu
+  api.ts                   Client gọi API
+  sound.ts                 Âm thanh Web Audio (bíp/ting)
+components/
+  TownCrier.tsx            Loa phường: thời tiết, sự kiện, dòng chạy
+  MarketBoard.tsx          Bảng chợ + sparkline + mua/bán
+  BagPanel.tsx             Túi mù: vốn TB, % lời/lỗ, cảnh báo kem tan
+  MapPanel.tsx             Bản đồ 4 khu + thanh tiến trình di chuyển
+  QuestsPanel.tsx          Đơn hàng xóm nhỏ
+  GaragePanel.tsx          Thuê/mua xe
+  StaffPanel.tsx           Thuê/tuyển/nâng cấp nhân viên
+  LeaderboardPanel.tsx     Bảng xếp hạng theo mùa
+  ShopPanel.tsx            Danh hiệu & trang trí sạp (chống lạm phát)
+```
 
-## File trong repo (sau khi đổi)
+## Lưu ý vận hành
 
-| File | Vai trò |
-|---|---|
-| `index.html` | Giao diện tool: tiêu đề, chọn chế độ, ô mô tả, chip phong cách/tỉ lệ, danh sách yêu cầu |
-| `style.css` | CSS tự viết, giao diện tối, font hệ thống, không CDN ngoài |
-| `app.js` | Logic: Firebase init, gửi request, lắng nghe danh sách, upload + thu nhỏ ảnh, hủy service worker cũ |
-| `vendor/firebase-app-compat.js` | SDK Firebase App compat 11.1.0 (tự chứa) |
-| `vendor/firebase-database-compat.js` | SDK Firebase RTDB compat 11.1.0 (tự chứa) |
-| `vercel.json` | Giữ nguyên |
-| `README.md` | File này |
-
-## Lưu ý
-
-- **Không dùng CDN ngoài**: không Tailwind, không Google Fonts, không
-  Three.js. Mọi thứ chạy bằng file local + Firebase SDK tự chứa.
-- Upload ảnh chỉnh: giới hạn file 5MB, chỉ nhận file ảnh; ảnh được thu
-  nhỏ bằng canvas về tối đa 1024px (JPEG 0.85) trước khi ghi lên Firebase.
-- Nút "Tạo ảnh" disable khi prompt trống, khi chưa chọn ảnh (chế độ
-  chỉnh ảnh), hoặc khi chưa nối được Firebase.
-- Firebase đang ở test mode (Rules mở, hết hạn ~2026-12-17): cần đặt
-  Rules chỉ cho `image-tool` trước hạn, ví dụ:
-  `{ "rules": { "image-tool": { ".read": true, ".write": true } } }`.
-- File cũ của quán (vendor/*.glb, three.module.js, textures.js,
-  manifest.json, sw.js, tex/, char-styles/, characters/, icons/) vẫn còn
-  trên đĩa nhưng **không còn được tham chiếu** — dọn trước khi push để
-  repo nhẹ.
-- Phần theo dõi yêu cầu (Muse kiểm tra định kỳ, tạo ảnh, ghi kết quả)
-  làm riêng bằng cron sau, không nằm trong web này.
+- Mọi phép tính tiền/EXP/nhiệm vụ đều kiểm tra phía server (API Routes), không tin dữ liệu client gửi lên. Có chống spam request (tối thiểu 300ms/giao dịch).
+- Giá thị trường dùng seeded noise theo timestamp 10s nên mọi client thấy chung một nhịp giá; lệch cung/cầu lưu trên server và hồi 10%/nhịp.
+- Hàng Kem Tươi Tan Chảy giảm 6% giá trị mỗi 30s giữ hàng (nhanh gấp đôi khi nắng gắt); Kho Báu & Lõi Năng Lượng có 15% bị trừ 20% số lượng khi cập bến.
