@@ -62,16 +62,24 @@ export function meltFactor(itemId: string, acquiredAt: number, now: number, melt
   return Math.max(0.2, Math.pow(0.94, periods));
 }
 
-export function buyPrice(itemId: string, zone: ZoneId, marketPrice: number): number {
-  const z = ZONE_MAP[zone];
-  const mult = (z.cheap[itemId] ?? 1) * z.buyAll;
-  return Math.max(1, Math.round(marketPrice * mult));
-}
-
 export function sellPrice(itemId: string, zone: ZoneId, marketPrice: number): number {
   const z = ZONE_MAP[zone];
   const mult = (z.sellBonus[itemId] ?? 1) * z.sellAll;
   return Math.max(1, Math.round(marketPrice * mult));
+}
+
+// Giá 1 món trong lô thương lái: giá gốc × factor đợt × hệ số mua khu vực.
+export function merchantUnitPrice(itemId: string, zone: ZoneId, factor: number): number {
+  const z = ZONE_MAP[zone];
+  const mult = (z.cheap[itemId] ?? 1) * z.buyAll;
+  return Math.max(1, Math.round(ITEM_MAP[itemId].base * factor * mult));
+}
+
+// Giá 1 món khách mua trả: giá gốc × factor đợt × hệ số bán khu vực.
+export function customerUnitPrice(itemId: string, zone: ZoneId, factor: number): number {
+  const z = ZONE_MAP[zone];
+  const mult = (z.sellBonus[itemId] ?? 1) * z.sellAll;
+  return Math.max(1, Math.round(ITEM_MAP[itemId].base * factor * mult));
 }
 
 export function sellFeeRate(p: Player, weatherFeeMult: number): number {

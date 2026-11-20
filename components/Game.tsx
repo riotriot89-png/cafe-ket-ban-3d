@@ -249,10 +249,10 @@ export default function Home() {
     }
   };
 
-  const doTrade = (itemId: string, action: "buy" | "sell", qty: number) =>
+  const doTrade = (action: "buy_merchant" | "sell_customer", waveIndex: number, offerId: string) =>
     act(async () => {
-      const res = await api.trade(playerIdRef.current!, action, itemId, qty);
-      pushToast(res.message, action === "buy" ? "info" : res.profit !== null && res.profit >= 0 ? "good" : "bad", action === "buy" ? "buy" : "sell");
+      const res = await api.trade(playerIdRef.current!, action, waveIndex, offerId);
+      pushToast(res.message, action === "buy_merchant" ? "info" : res.profit !== null && res.profit >= 0 ? "good" : "bad", action === "buy_merchant" ? "buy" : "sell");
       return res;
     }, "click");
 
@@ -416,10 +416,10 @@ export default function Home() {
           <>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="lg:col-span-2">
-                <MarketBoard state={state} busy={busy} onTrade={doTrade} />
+                <MarketBoard state={state} now={now} busy={busy} onTrade={doTrade} />
               </div>
               <div className="space-y-4">
-                <BagPanel state={state} now={now} busy={busy} onSell={(id, q) => doTrade(id, "sell", q)} />
+                <BagPanel state={state} now={now} />
                 <MapPanel state={state} now={now} busy={busy} onTravel={doTravel} />
                 <QuestsPanel state={state} busy={busy} onClaim={(id) => doQuest("claim", id)} onReroll={(id) => doQuest("reroll", id)} />
                 <LeaderboardPanel state={state} />

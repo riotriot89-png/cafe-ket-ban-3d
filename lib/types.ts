@@ -60,6 +60,8 @@ export interface Player {
   events: GameEvent[];
   createdAt: number;
   lastActionAt: number;
+  boughtOffers?: string[]; // id lô thương lái đã mua (tỉa theo đợt trong resolvePlayer)
+  servedCustomers?: string[]; // id lô khách mua đã phục vụ
 }
 
 export interface GameEvent {
@@ -75,6 +77,40 @@ export interface MarketPrice {
   prev: number; // giá nhịp trước
   history: number[]; // 10 nhịp gần nhất
   changePct: number;
+}
+
+// ---------- Đợt giao dịch (waves) ----------
+export interface MerchantOffer {
+  id: string; // m:{waveIndex}:{merchantIdx}:{offerIdx}
+  itemId: string;
+  qty: number; // số lượng cả lô — mua là mua hết lô
+  factor: number; // hệ số nhân giá gốc (chưa nhân hệ số khu vực)
+}
+
+export interface Merchant {
+  id: string;
+  name: string;
+  emoji: string;
+  offers: MerchantOffer[];
+}
+
+export interface CustomerOffer {
+  id: string; // c:{waveIndex}:{customerIdx}
+  itemId: string;
+  qty: number; // số lượng khách muốn mua
+  factor: number; // hệ số nhân giá gốc (chưa nhân hệ số khu vực)
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  emoji: string;
+  offer: CustomerOffer;
+}
+
+export interface WavesInfo {
+  merchant: { waveIndex: number; startsAt: number; endsAt: number; merchants: Merchant[] };
+  customer: { waveIndex: number; startsAt: number; endsAt: number; customers: Customer[] };
 }
 
 export interface MarketSnapshot {
@@ -103,6 +139,7 @@ export interface StateResponse {
   now: number;
   player: Player;
   market: MarketSnapshot;
+  waves: WavesInfo;
   season: { id: string; endsAt: number };
   leaderboard: LeaderboardEntry[];
   netWorth: number;

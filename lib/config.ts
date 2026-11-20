@@ -13,6 +13,52 @@ export const ACTION_MIN_GAP_MS = 300; // chống spam request
 export const RENTAL_TRIPS = 1; // thuê xe = dùng cho 1 chuyến
 export const STAFF_RENT_MS = 5 * 60_000; // thuê nhân viên theo ca 5 phút
 
+// ---------- Đợt giao dịch (waves): thương lái tới bán / khách mua tới mua ----------
+// Không còn mua/bán tức thì ở giá chợ: chỉ giao dịch được khi có đợt, mỗi lô
+// chỉ mua/bán được 1 lần trong đợt đó. Đợt sinh xác định theo thời gian nên
+// mọi người chơi thấy giống nhau, không cần lưu store.
+export const WAVE_MS = 180_000; // mỗi đợt dài 3 phút
+export const MERCHANT_COUNT = 3; // số thương lái mỗi đợt
+export const OFFERS_PER_MERCHANT = 2; // số lô mỗi thương lái rao
+export const CUSTOMER_COUNT = 4; // số khách mua mỗi đợt
+export const MERCHANT_FACTOR_MIN = 0.75; // hệ số giá thương lái (nhân giá gốc)
+export const MERCHANT_FACTOR_MAX = 1.3;
+export const CUSTOMER_FACTOR_MIN = 0.95; // hệ số giá khách trả (nhân giá gốc)
+export const CUSTOMER_FACTOR_MAX = 1.45;
+export const MERCHANT_QTY_MIN = 2; // số lượng mỗi lô thương lái
+export const MERCHANT_QTY_MAX = 8;
+export const CUSTOMER_QTY_MIN = 2; // số lượng mỗi khách muốn mua
+export const CUSTOMER_QTY_MAX = 6;
+
+export interface WavePersonDef {
+  name: string;
+  emoji: string;
+}
+
+export const MERCHANT_NAMES: WavePersonDef[] = [
+  { name: "Bác Tư Hàng Rong", emoji: "🧺" },
+  { name: "Cô Ba Bánh", emoji: "🍰" },
+  { name: "Chú Sáu Sạp", emoji: "🛖" },
+  { name: "Dì Năm Gánh", emoji: "🧺" },
+  { name: "Bà Tám Chợ Đêm", emoji: "🏮" },
+  { name: "Anh Hai Xe Thồ", emoji: "🛵" },
+  { name: "Cô Út Bánh Tráng", emoji: "🍘" },
+  { name: "Chú Bảy Gánh Hàng", emoji: "🥬" },
+];
+
+export const CUSTOMER_NAMES: WavePersonDef[] = [
+  { name: "Bé Miu", emoji: "🐱" },
+  { name: "Anh Tèo", emoji: "🧑" },
+  { name: "Cô Lan", emoji: "🌸" },
+  { name: "Bé Bông", emoji: "🐰" },
+  { name: "Chú Minh", emoji: "🧔" },
+  { name: "Chị Hằng", emoji: "👩" },
+  { name: "Ông Ngoại", emoji: "👴" },
+  { name: "Bé Na", emoji: "👧" },
+  { name: "Anh Kiệt", emoji: "🧑‍🎓" },
+  { name: "Cô Hồng", emoji: "💐" },
+];
+
 // ---------- 8 cấp độ thương lái ----------
 export interface LevelDef {
   level: number;
@@ -261,7 +307,7 @@ export const QUEST_TEMPLATES: QuestTemplate[] = [
       const qty = 3 + (Math.abs(seed >> 3) % 8);
       return {
         title: `Bán ${qty} ${item.name}`,
-        desc: `Bán thành công ${qty} món ${item.name} ở bất kỳ chợ nào.`,
+        desc: `Bán ${qty} món ${item.name} cho khách trong đợt Khách Mua — khách tới theo đợt, đừng bán vội nha.`,
         target: qty, itemId: item.id,
         rewardXu: Math.round(qty * item.base * 0.2), rewardExp: 30 + qty * 5,
       };

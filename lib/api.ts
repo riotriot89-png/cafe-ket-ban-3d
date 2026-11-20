@@ -27,10 +27,10 @@ export const api = {
       body: JSON.stringify({ id, nickname }),
     });
   },
-  async trade(playerId: string, action: "buy" | "sell", itemId: string, qty: number) {
+  async trade(playerId: string, action: "buy_merchant" | "sell_customer", waveIndex: number, offerId: string) {
     return call<{ player: unknown; message: string; profit: number | null }>("/api/trade", {
       method: "POST",
-      body: JSON.stringify({ playerId, action, itemId, qty }),
+      body: JSON.stringify({ playerId, action, waveIndex, offerId }),
     });
   },
   async travel(playerId: string, to: string) {

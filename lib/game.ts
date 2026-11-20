@@ -6,12 +6,10 @@ import {
   ITEM_MAP,
   QUEST_TEMPLATES,
   RENTAL_TRIPS,
-  SELL_FEE_PCT,
   SHOP_ITEMS,
   STAFF_MAP,
   STAFF_RENT_MS,
   START_XU,
-  SUPPLY_DEMAND_PCT,
   VEHICLES,
   VEHICLE_MAP,
   WEATHERS,
@@ -24,18 +22,30 @@ import {
   activeVehicle,
   bagCapacity,
   bagUsed,
-  buyPrice,
+  customerUnitPrice,
   levelInfo,
   meltFactor,
+  merchantUnitPrice,
   netWorth,
-  sellPrice,
+  sellFeeRate,
   staffEffects,
 } from "./shared";
 import { advanceMarket, marketSnapshot, tickIndex, weatherAt, type MarketState } from "./market";
 import { getMarketState, getPlayer, listPlayers, saveMarketState, savePlayer, storeGet, storeSet } from "./store";
 import { clamp, currentSeason, seededNoise, uid } from "./util";
+import {
+  customerWaveIndex,
+  findCustomerOffer,
+  findMerchantOffer,
+  getCustomerWaveByIndex,
+  getMerchantWaveByIndex,
+  getWaves,
+  merchantWaveIndex,
+  waveIndexOfOfferId,
+} from "./waves";
 import type {
   GameEvent,
+  InventoryLot,
   LeaderboardEntry,
   MarketSnapshot,
   Player,
@@ -85,10 +95,6 @@ export async function getMarket(now: number): Promise<{ state: MarketState; snap
   return { state: advanced, snap };
 }
 
-function marketPriceOf(snap: MarketSnapshot, itemId: string): number {
-  return snap.prices.find((p) => p.itemId === itemId)?.price ?? ITEM_MAP[itemId].base;
-}
-
 // ---------- Người chơi ----------
 export async function createPlayer(nickname?: string): Promise<Player> {
   const now = Date.now();
@@ -123,6 +129,8 @@ export async function createPlayer(nickname?: string): Promise<Player> {
     events: [{ id: uid("ev"), kind: "info", text: `Chào mừng ${name} đến với xóm nhỏ! Bắt đầu với ${START_XU.toLocaleString("vi-VN")} Xu nha ^w^`, at: now }],
     createdAt: now,
     lastActionAt: 0,
+    boughtOffers: [],
+    servedCustomers: [],
   };
   p.quests = [genQuest(p, 0), genQuest(p, 1), genQuest(p, 2)];
   await savePlayer(p);
@@ -191,6 +199,27 @@ function updateQuestProgress(p: Player, fn: (q: Quest) => void) {
 // ---------- Resolve: di chuyển tới nơi, hết hạn thuê, mùa mới, runner tự chốt lời ----------
 async function resolvePlayer(p: Player, now: number, snap: MarketSnapshot): Promise<boolean> {
   let changed = false;
+
+  // Tỉa lịch sử đợt đã mua/bán: chỉ giữ đợt hiện tại và đợt trước (người chơi
+  // cũ trong Redis chưa có 2 field này thì khởi tạo rỗng).
+  const mIdx = merchantWaveIndex(now);
+  const cIdx = customerWaveIndex(now);
+  const prune = (ids: string[] | undefined, kind: "m" | "c", cur: number): string[] =>
+    (ids ?? []).filter((id) => {
+      if (!id.startsWith(`${kind}:`)) return false;
+      const idx = waveIndexOfOfferId(id);
+      return idx !== null && idx >= cur - 1;
+    });
+  const bought = prune(p.boughtOffers, "m", mIdx);
+  const served = prune(p.servedCustomers, "c", cIdx);
+  if (p.boughtOffers === undefined || bought.length !== p.boughtOffers.length) {
+    p.boughtOffers = bought;
+    changed = true;
+  }
+  if (p.servedCustomers === undefined || served.length !== p.servedCustomers.length) {
+    p.servedCustomers = served;
+    changed = true;
+  }
 
   // Đổi mùa: chốt baseline mới
   if (p.seasonId !== snap.seasonId) {
@@ -279,31 +308,32 @@ async function resolvePlayer(p: Player, now: number, snap: MarketSnapshot): Prom
     }
   }
 
-  // Mèo Máy Chạy Việc: tự chốt lời các lô lãi >= 30% (tối đa 3 lô/lần)
+  // Mèo Máy Chạy Việc: tự bán cho khách trong đợt Khách Mua hiện tại khi đơn giá
+  // (sau tan + phí) lãi >= 30% so với giá vốn — bán đúng số lượng khách cần,
+  // tối đa 3 lô/lần, đánh dấu khách đã phục vụ như bán tay.
   const eff = staffEffects(p);
   if (eff.hasRunner && p.inventory.length > 0 && !p.travel) {
+    const wave = getWaves(now).customer;
+    const weather = WEATHERS.find((w) => w.id === snap.weather)!;
+    const feeRate = sellFeeRate(p, weather.feeMult);
     let sold = 0;
-    for (const lot of [...p.inventory]) {
+    for (const c of wave.customers) {
       if (sold >= 3) break;
-      const unit = sellPrice(lot.itemId, p.zone, marketPriceOf(snap, lot.itemId));
-      const profitPct = (unit - lot.avgCost) / lot.avgCost;
-      if (profitPct >= 0.3) {
-        const fee = Math.round(unit * lot.qty * Math.max(0, SELL_FEE_PCT - eff.feeCut));
-        const revenue = unit * lot.qty - fee;
-        const profit = revenue - lot.avgCost * lot.qty;
-        p.xu += revenue;
-        p.totalSold += lot.qty;
-        p.totalProfit += profit;
-        addExp(p, (profit > 0 ? Math.floor(profit / 25) : 0) * eff.expMult, now);
-        pushEvent(p, "good", `Mèo Máy tự chốt lời ${ITEM_MAP[lot.itemId].name} x${lot.qty}, lãi ${profit.toLocaleString("vi-VN")} Xu.`, now);
-        p.inventory = p.inventory.filter((l) => l !== lot);
-        updateQuestProgress(p, (q) => {
-          if (q.kind === "sell_qty" && q.itemId === lot.itemId) q.progress += lot.qty;
-          if (q.kind === "profit_once") q.progress = Math.max(q.progress, profit);
-        });
-        sold += 1;
-        changed = true;
-      }
+      const offer = c.offer;
+      if ((p.servedCustomers ?? []).includes(offer.id)) continue;
+      const lot = p.inventory.find((l) => l.itemId === offer.itemId);
+      if (!lot || lot.qty < offer.qty) continue;
+      const unit = Math.round(
+        customerUnitPrice(offer.itemId, p.zone, offer.factor) *
+          meltFactor(offer.itemId, lot.acquiredAt, now, weather.meltMult),
+      );
+      const { revenue, profit } = customerSaleQuote(lot, offer.qty, unit, feeRate);
+      if (profit <= 0 || (revenue / offer.qty - lot.avgCost) / lot.avgCost < 0.3) continue;
+      applyCustomerSale(p, lot, offer.qty, unit, feeRate, now);
+      (p.servedCustomers ??= []).push(offer.id);
+      pushEvent(p, "good", `Mèo Máy tự bán ${ITEM_MAP[offer.itemId].name} x${offer.qty} cho ${c.name}, lãi ${profit.toLocaleString("vi-VN")} Xu.`, now);
+      sold += 1;
+      changed = true;
     }
   }
 
@@ -340,6 +370,7 @@ function buildState(p: Player, snap: MarketSnapshot, now: number): StateResponse
     now,
     player: p,
     market: snap,
+    waves: getWaves(now),
     season: { id: snap.seasonId, endsAt: snap.seasonEndsAt },
     leaderboard: [],
     netWorth: netWorth(p),
@@ -349,62 +380,19 @@ function buildState(p: Player, snap: MarketSnapshot, now: number): StateResponse
   };
 }
 
-// ---------- Mua / Bán (server kiểm tra toàn bộ) ----------
-export async function trade(
-  playerId: string,
-  action: "buy" | "sell",
-  itemId: string,
-  qty: number,
-): Promise<{ player: Player; message: string; profit?: number }> {
-  const now = Date.now();
-  const p = await getPlayer(playerId);
-  if (!p) throw new GameError("Không tìm thấy người chơi.", 404);
-  checkSpam(p, now);
-  if (p.travel) throw new GameError("Đang di chuyển, không giao dịch được đâu! Chờ tới nơi đã nha.", 400);
-  const item = ITEM_MAP[itemId];
-  if (!item) throw new GameError("Món hàng không tồn tại.", 400);
-  if (item.level > p.level) throw new GameError(`Món này cần đạt ${levelForExp(p.exp).name} Lv.${item.level} mới mở khóa.`, 403);
-  if (!Number.isInteger(qty) || qty < 1 || qty > 999) throw new GameError("Số lượng không hợp lệ.", 400);
-
-  const { state, snap } = await getMarket(now);
-  const changed = await resolvePlayer(p, now, snap);
-  void changed;
-  const mPrice = marketPriceOf(snap, itemId);
-  const weather = WEATHERS.find((w) => w.id === snap.weather)!;
-  const eff = staffEffects(p);
-
-  if (action === "buy") {
-    const unit = buyPrice(itemId, p.zone, mPrice);
-    const total = unit * qty;
-    if (p.xu < total) throw new GameError(`Không đủ Xu! Cần ${total.toLocaleString("vi-VN")} Xu, bạn có ${p.xu.toLocaleString("vi-VN")} Xu.`, 400);
-    if (bagUsed(p) + qty * item.slots > bagCapacity(p)) {
-      throw new GameError(`Túi không đủ chỗ! Cần ${qty * item.slots} ô, còn trống ${bagCapacity(p) - bagUsed(p)} ô.`, 400);
-    }
-    p.xu -= total;
-    const lot = p.inventory.find((l) => l.itemId === itemId);
-    if (lot) {
-      lot.avgCost = Math.round((lot.avgCost * lot.qty + unit * qty) / (lot.qty + qty));
-      lot.qty += qty;
-    } else {
-      p.inventory.push({ itemId, qty, avgCost: unit, acquiredAt: now });
-    }
-    state.offsets[itemId] = clamp((state.offsets[itemId] ?? 0) + SUPPLY_DEMAND_PCT * qty, -0.5, 0.5);
-    await saveMarketState(state);
-    await savePlayer(p);
-    return { player: p, message: `Đã mua ${item.name} x${qty} với ${total.toLocaleString("vi-VN")} Xu. ^w^` };
-  }
-
-  // sell
-  const lot = p.inventory.find((l) => l.itemId === itemId);
-  if (!lot || lot.qty < qty) throw new GameError(`Bạn không có đủ ${item.name} để bán.`, 400);
-  const melt = meltFactor(itemId, lot.acquiredAt, now, weather.meltMult);
-  const unit = Math.round(sellPrice(itemId, p.zone, mPrice) * melt);
-  const feeRate = Math.max(0, SELL_FEE_PCT - eff.feeCut) * weather.feeMult;
+// ---------- Giao dịch theo đợt (không còn mua/bán tức thì ở giá chợ) ----------
+// Tính thu/lãi của một lần bán cho khách. unit: đơn giá đã tính tan (chưa trừ phí).
+function customerSaleQuote(lot: InventoryLot, qty: number, unit: number, feeRate: number): { revenue: number; profit: number } {
   const gross = unit * qty;
   const fee = Math.round(gross * feeRate);
   const revenue = gross - fee;
-  const cost = lot.avgCost * qty;
-  const profit = revenue - cost;
+  return { revenue, profit: revenue - lot.avgCost * qty };
+}
+
+// Trừ hàng, cộng Xu, tính lãi/EXP/nhiệm vụ cho một lần bán cho khách.
+function applyCustomerSale(p: Player, lot: InventoryLot, qty: number, unit: number, feeRate: number, now: number): { revenue: number; profit: number } {
+  const eff = staffEffects(p);
+  const { revenue, profit } = customerSaleQuote(lot, qty, unit, feeRate);
   lot.qty -= qty;
   if (lot.qty <= 0) p.inventory = p.inventory.filter((l) => l !== lot);
   p.xu += revenue;
@@ -412,11 +400,90 @@ export async function trade(
   p.totalProfit += profit;
   addExp(p, (profit > 0 ? Math.floor(profit / 25) : 0) * eff.expMult, now);
   updateQuestProgress(p, (q) => {
-    if (q.kind === "sell_qty" && q.itemId === itemId) q.progress += qty;
+    if (q.kind === "sell_qty" && q.itemId === lot.itemId) q.progress += qty;
     if (q.kind === "profit_once") q.progress = Math.max(q.progress, profit);
   });
-  state.offsets[itemId] = clamp((state.offsets[itemId] ?? 0) - SUPPLY_DEMAND_PCT * qty, -0.5, 0.5);
-  await saveMarketState(state);
+  return { revenue, profit };
+}
+
+// Mua cả lô của thương lái trong đợt hiện tại (mỗi lô chỉ mua được 1 lần).
+export async function buyFromMerchant(
+  playerId: string,
+  waveIndex: number,
+  offerId: string,
+): Promise<{ player: Player; message: string }> {
+  const now = Date.now();
+  const p = await getPlayer(playerId);
+  if (!p) throw new GameError("Không tìm thấy người chơi.", 404);
+  checkSpam(p, now);
+  if (p.travel) throw new GameError("Đang di chuyển, không giao dịch được đâu! Chờ tới nơi đã nha.", 400);
+  const wave = getMerchantWaveByIndex(waveIndex);
+  if (now < wave.startsAt || now >= wave.endsAt) {
+    throw new GameError("Đợt này đã đi rồi, chờ đợt sau nha!", 400);
+  }
+  const found = findMerchantOffer(wave, offerId);
+  if (!found) throw new GameError("Lô hàng này không còn ở chợ nữa.", 400);
+  const { merchant, offer } = found;
+  if ((p.boughtOffers ?? []).includes(offer.id)) {
+    throw new GameError("Bạn đã mua lô này rồi, chờ đợt sau nha!", 400);
+  }
+  const item = ITEM_MAP[offer.itemId];
+  if (!item) throw new GameError("Món hàng không tồn tại.", 400);
+  if (item.level > p.level) throw new GameError(`Món này cần đạt Lv.${item.level} mới mở khóa.`, 403);
+  const unit = merchantUnitPrice(offer.itemId, p.zone, offer.factor);
+  const total = unit * offer.qty;
+  if (p.xu < total) throw new GameError(`Không đủ Xu! Cần ${total.toLocaleString("vi-VN")} Xu, bạn có ${p.xu.toLocaleString("vi-VN")} Xu.`, 400);
+  if (bagUsed(p) + offer.qty * item.slots > bagCapacity(p)) {
+    throw new GameError(`Túi không đủ chỗ! Cần ${offer.qty * item.slots} ô, còn trống ${bagCapacity(p) - bagUsed(p)} ô.`, 400);
+  }
+  p.xu -= total;
+  const lot = p.inventory.find((l) => l.itemId === offer.itemId);
+  if (lot) {
+    lot.avgCost = Math.round((lot.avgCost * lot.qty + unit * offer.qty) / (lot.qty + offer.qty));
+    lot.qty += offer.qty;
+  } else {
+    p.inventory.push({ itemId: offer.itemId, qty: offer.qty, avgCost: unit, acquiredAt: now });
+  }
+  (p.boughtOffers ??= []).push(offer.id);
+  await savePlayer(p);
+  return { player: p, message: `Đã mua ${item.name} x${offer.qty} của ${merchant.name} với ${total.toLocaleString("vi-VN")} Xu. ^w^` };
+}
+
+// Bán đúng số lượng khách cần trong đợt Khách Mua hiện tại (mỗi khách chỉ phục vụ 1 lần).
+export async function sellToCustomer(
+  playerId: string,
+  waveIndex: number,
+  offerId: string,
+): Promise<{ player: Player; message: string; profit?: number }> {
+  const now = Date.now();
+  const p = await getPlayer(playerId);
+  if (!p) throw new GameError("Không tìm thấy người chơi.", 404);
+  checkSpam(p, now);
+  if (p.travel) throw new GameError("Đang di chuyển, không giao dịch được đâu! Chờ tới nơi đã nha.", 400);
+  const wave = getCustomerWaveByIndex(waveIndex);
+  if (now < wave.startsAt || now >= wave.endsAt) {
+    throw new GameError("Đợt này đã đi rồi, chờ đợt sau nha!", 400);
+  }
+  const found = findCustomerOffer(wave, offerId);
+  if (!found) throw new GameError("Khách này không còn ở chợ nữa.", 400);
+  const { customer, offer } = found;
+  if ((p.servedCustomers ?? []).includes(offer.id)) {
+    throw new GameError("Bạn đã bán cho khách này rồi, chờ khách mới nha!", 400);
+  }
+  const item = ITEM_MAP[offer.itemId];
+  if (!item) throw new GameError("Món hàng không tồn tại.", 400);
+  if (item.level > p.level) throw new GameError(`Món này cần đạt Lv.${item.level} mới mở khóa.`, 403);
+  const lot = p.inventory.find((l) => l.itemId === offer.itemId);
+  if (!lot || lot.qty < offer.qty) {
+    throw new GameError(`Bạn không có đủ ${item.name} để bán cho khách (cần ${offer.qty} món).`, 400);
+  }
+  const { snap } = await getMarket(now);
+  const weather = WEATHERS.find((w) => w.id === snap.weather)!;
+  const feeRate = sellFeeRate(p, weather.feeMult);
+  const melt = meltFactor(offer.itemId, lot.acquiredAt, now, weather.meltMult);
+  const unit = Math.round(customerUnitPrice(offer.itemId, p.zone, offer.factor) * melt);
+  const { revenue, profit } = applyCustomerSale(p, lot, offer.qty, unit, feeRate, now);
+  (p.servedCustomers ??= []).push(offer.id);
   await savePlayer(p);
   const meltNote = melt < 1 ? ` (kem tan mất ${Math.round((1 - melt) * 100)}% giá trị)` : "";
   return {
@@ -424,8 +491,8 @@ export async function trade(
     profit,
     message:
       profit >= 0
-        ? `Đã bán ${item.name} x${qty}, thu ${revenue.toLocaleString("vi-VN")} Xu, lãi ${profit.toLocaleString("vi-VN")} Xu!${meltNote} UwU`
-        : `Đã bán ${item.name} x${qty}, thu ${revenue.toLocaleString("vi-VN")} Xu, lỗ ${Math.abs(profit).toLocaleString("vi-VN")} Xu.${meltNote} T_T`,
+        ? `Đã bán ${item.name} x${offer.qty} cho ${customer.name}, thu ${revenue.toLocaleString("vi-VN")} Xu, lãi ${profit.toLocaleString("vi-VN")} Xu!${meltNote} UwU`
+        : `Đã bán ${item.name} x${offer.qty} cho ${customer.name}, thu ${revenue.toLocaleString("vi-VN")} Xu, lỗ ${Math.abs(profit).toLocaleString("vi-VN")} Xu.${meltNote} T_T`,
   };
 }
 

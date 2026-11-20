@@ -8,13 +8,9 @@ import type { StateResponse } from "@/lib/types";
 export default function BagPanel({
   state,
   now,
-  busy,
-  onSell,
 }: {
   state: StateResponse;
   now: number;
-  busy: boolean;
-  onSell: (itemId: string, qty: number) => void;
 }) {
   const { player, market } = state;
   const weather = WEATHERS.find((w) => w.id === market.weather)!;
@@ -51,7 +47,7 @@ export default function BagPanel({
                     {item.name} <span className="text-pink-600">x{lot.qty}</span>
                   </div>
                   <div className="text-xs font-bold text-gray-500">
-                    Vốn TB {lot.avgCost.toLocaleString("vi-VN")} • Bán {unitSell.toLocaleString("vi-VN")} Xu/món •{" "}
+                    Vốn TB {lot.avgCost.toLocaleString("vi-VN")} • Giá chợ {unitSell.toLocaleString("vi-VN")} Xu/món •{" "}
                     <span className={profitPct >= 0 ? "text-emerald-600" : "text-rose-500"}>
                       {profitPct >= 0 ? "+" : ""}
                       {profitPct.toFixed(1)}%
@@ -63,13 +59,7 @@ export default function BagPanel({
                     </div>
                   )}
                 </div>
-                <button
-                  disabled={busy || !!player.travel}
-                  onClick={() => onSell(lot.itemId, lot.qty)}
-                  className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-[0_3px_0_rgba(6,95,70,0.4)] transition active:translate-y-0.5 active:shadow-none disabled:opacity-40"
-                >
-                  Bán hết
-                </button>
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-extrabold text-emerald-700">Bán ở tab 🧑 Khách mua</span>
               </li>
             );
           })}
