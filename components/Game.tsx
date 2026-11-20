@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { CUTE_NAMES, LEVELS } from "@/lib/config";
+import { CUTE_NAMES, ZONES } from "@/lib/config";
 import { playSound, type SoundKind } from "@/lib/sound";
 import type { GameEvent, StateResponse, ZoneId } from "@/lib/types";
 import TownCrier from "@/components/TownCrier";
@@ -57,6 +57,29 @@ export default function Home() {
   const [editingName, setEditingName] = useState(false);
   const [authTab, setAuthTab] = useState<"guest" | "register" | "login">("guest");
   const [accountUser, setAccountUser] = useState<string | null>(null);
+
+  // Tab điều hướng chính (mobile không phải kéo dài): lưu tab đang chọn để mở lại đúng chỗ.
+  type TabId = "cho" | "tui" | "map" | "quests" | "leaderboard" | "garage" | "staff" | "shop";
+  const TABS: { id: TabId; label: string; emoji: string }[] = [
+    { id: "cho", label: "Chợ", emoji: "🛒" },
+    { id: "tui", label: "Túi", emoji: "🎒" },
+    { id: "map", label: "Bản đồ", emoji: "🗺️" },
+    { id: "quests", label: "Nhiệm vụ", emoji: "📋" },
+    { id: "leaderboard", label: "BXH", emoji: "🏆" },
+    { id: "garage", label: "Gara", emoji: "🚚" },
+    { id: "staff", label: "Nhân viên", emoji: "🐾" },
+    { id: "shop", label: "Shop", emoji: "🛍️" },
+  ];
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (typeof window === "undefined") return "cho";
+    const saved = localStorage.getItem("tmcc_tab");
+    return TABS.some((t) => t.id === saved) ? (saved as TabId) : "cho";
+  });
+  const switchTab = (tab: TabId) => {
+    setActiveTab(tab);
+    localStorage.setItem("tmcc_tab", tab);
+    window.scrollTo({ top: 0 });
+  };
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState("");
@@ -313,6 +336,20 @@ export default function Home() {
     if (next) playSound("click", true);
   };
 
+  // Dữ liệu cho badge trên thanh tab + banner di chuyển.
+  const bagCount = state ? state.player.inventory.reduce((s, l) => s + l.qty, 0) : 0;
+  const questsReady = state ? state.player.quests.filter((q) => q.done && !q.claimed).length : 0;
+  const merchantCountdown = state
+    ? (() => {
+        const s = Math.max(0, Math.floor((state.waves.merchant.endsAt - now) / 1000));
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      })()
+    : "3:00";
+  const travel = state?.player.travel ?? null;
+  const travelDest = travel ? ZONES.find((z) => z.id === travel.to) : null;
+  const travelProgress = travel ? Math.min(1, Math.max(0, (now - travel.startedAt) / travel.durationMs)) : 0;
+  const travelSecs = travel ? Math.max(0, Math.ceil((travel.endsAt - now) / 1000)) : 0;
+
   return (
     <main className="min-h-screen bg-[#FFFBF5] pb-10 text-gray-800">
       {/* Header */}
@@ -322,7 +359,7 @@ export default function Home() {
             <span className="text-3xl">🧺</span>
             <div>
               <h1 className="text-xl font-black leading-none text-pink-600">TÚI MÙ CHẠY CHỢ</h1>
-              <p className="text-[11px] font-bold text-pink-400">Buôn bán dễ thương • Chạy hàng vui vẻ ^w^</p>
+              <p className="hidden text-[11px] font-bold text-pink-400 sm:block">Buôn bán dễ thương • Chạy hàng vui vẻ ^w^</p>
             </div>
           </div>
           {state && (
@@ -407,6 +444,52 @@ export default function Home() {
             </>
           )}
         </div>
+        {state && (
+          <nav className="mx-auto max-w-7xl px-4 pb-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {TABS.map((t) => {
+                const active = activeTab === t.id;
+                const badge =
+                  t.id === "tui" && bagCount > 0
+                    ? String(bagCount)
+                    : t.id === "quests" && questsReady > 0
+                      ? String(questsReady)
+                      : t.id === "cho"
+                        ? merchantCountdown
+                        : null;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => switchTab(t.id)}
+                    className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border-2 px-3 py-1.5 text-sm font-extrabold transition active:translate-y-0.5 ${
+                      active ? "border-pink-500 bg-pink-500 text-white shadow-[0_3px_0_rgba(190,24,93,0.4)]" : "border-pink-200 bg-white text-pink-600"
+                    }`}
+                  >
+                    <span>{t.emoji}</span>
+                    <span>{t.label}</span>
+                    {badge && (
+                      <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-black leading-none ${active ? "bg-white/25 text-white" : "bg-pink-100 text-pink-600"}`}>
+                        {badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+        )}
+        {travel && travelDest && (
+          <div className="mx-auto max-w-7xl px-4 pb-2">
+            <div className="rounded-2xl border-2 border-sky-200 bg-sky-50 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm font-extrabold text-sky-700">
+                <span className="animate-bounce">🚚</span> Đang chạy tới {travelDest.emoji} {travelDest.name}... còn {travelSecs} giây
+              </div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sky-100">
+                <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-pink-400 transition-all" style={{ width: `${travelProgress * 100}%` }} />
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="mx-auto max-w-7xl space-y-4 px-4 pt-4">
@@ -414,24 +497,16 @@ export default function Home() {
 
         {state ? (
           <>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <MarketBoard state={state} now={now} busy={busy} onTrade={doTrade} />
-              </div>
-              <div className="space-y-4">
-                <BagPanel state={state} now={now} />
-                <MapPanel state={state} now={now} busy={busy} onTravel={doTravel} />
-                <QuestsPanel state={state} busy={busy} onClaim={(id) => doQuest("claim", id)} onReroll={(id) => doQuest("reroll", id)} />
-                <LeaderboardPanel state={state} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <GaragePanel state={state} busy={busy} onGarage={doGarage} />
-              <StaffPanel state={state} busy={busy} onStaff={(a, t, m) => doStaff(a, t, m)} />
-            </div>
-            <ShopPanel state={state} busy={busy} onShop={doShop} />
+            {activeTab === "cho" && <MarketBoard state={state} now={now} busy={busy} onTrade={doTrade} />}
+            {activeTab === "tui" && <BagPanel state={state} now={now} />}
+            {activeTab === "map" && <MapPanel state={state} now={now} busy={busy} onTravel={doTravel} />}
+            {activeTab === "quests" && <QuestsPanel state={state} busy={busy} onClaim={(id) => doQuest("claim", id)} onReroll={(id) => doQuest("reroll", id)} />}
+            {activeTab === "leaderboard" && <LeaderboardPanel state={state} />}
+            {activeTab === "garage" && <GaragePanel state={state} busy={busy} onGarage={doGarage} />}
+            {activeTab === "staff" && <StaffPanel state={state} busy={busy} onStaff={(a, t, m) => doStaff(a, t, m)} />}
+            {activeTab === "shop" && <ShopPanel state={state} busy={busy} onShop={doShop} />}
             <footer className="rounded-3xl border-2 border-pink-100 bg-white/70 px-4 py-3 text-center text-xs font-bold text-gray-400">
-              Cấp độ thương lái: {LEVELS.map((l) => `Lv.${l.level} ${l.name}`).join(" • ")} — Giá thị trường đồng bộ cho cả xóm mỗi 10 giây. Chúc bạn buôn may bán đắt! UwU
+              Giá thị trường đồng bộ cho cả xóm mỗi 10 giây. Chúc bạn buôn may bán đắt! UwU
             </footer>
           </>
         ) : (
@@ -551,7 +626,7 @@ export default function Home() {
       )}
 
       {/* Toasts */}
-      <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+      <div className="fixed bottom-4 left-4 right-4 z-50 flex flex-col gap-2 sm:left-auto sm:w-80">
         {toasts.map((t) => (
           <div key={t.id} className={`rounded-2xl border-2 px-3 py-2 text-sm font-bold shadow-lg ${toastStyle[t.kind]}`}>
             {t.text}
