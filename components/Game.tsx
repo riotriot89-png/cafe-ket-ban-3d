@@ -81,8 +81,19 @@ export default function Home() {
           pushToast(ev.text, ev.kind, sound);
         }
       }
-    } catch {
-      // mất mạng tạm thời thì poll lần sau thử lại
+    } catch (e) {
+      // Người chơi không còn trên server (bộ nhớ tạm của server đã mất) thì
+      // xóa id cũ để hiện lại màn đặt tên, thay vì kẹt ở "Đang mở sạp..." mãi.
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("Không tìm thấy người chơi")) {
+        localStorage.removeItem("tmcc_player_id");
+        localStorage.removeItem("tmcc_nickname");
+        playerIdRef.current = null;
+        setPlayerId(null);
+        setShowNameModal(true);
+        pushToast("Phiên chơi cũ hết hạn rồi, đặt tên lại để vào sạp mới nha!", "info");
+      }
+      // Lỗi khác (mất mạng tạm thời) thì poll lần sau thử lại.
     }
   }, [pushToast]);
 
