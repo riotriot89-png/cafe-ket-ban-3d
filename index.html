@@ -2,148 +2,85 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#150d2e">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Café Kết Bạn">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
-<title>Café Kết Bạn 3D — Quán cà phê kết bạn</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tạo Ảnh với Muse</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
 <link rel="stylesheet" href="style.css">
-<script type="importmap">
-{
-  "imports": {
-    "three": "./vendor/three.module.js",
-    "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
-    "three/addons/renderers/CSS3DRenderer.js": "./vendor/CSS3DRenderer.js",
-    "three/addons/environments/RoomEnvironment.js": "./vendor/RoomEnvironment.js",
-    "three/addons/loaders/GLTFLoader.js": "./vendor/loaders/GLTFLoader.js",
-    "three/addons/utils/BufferGeometryUtils.js": "./vendor/utils/BufferGeometryUtils.js",
-    "three/addons/utils/SkeletonUtils.js": "./vendor/utils/SkeletonUtils.js"
-  }
-}
-</script>
 </head>
 <body>
-<div id="vignette"></div>
-<div id="scene-container"></div>
-<div id="bubbles"></div>
-  <div id="nametags"></div>
+<div class="wrap">
 
-<header id="topbar">
-  <div class="logo">☕ <b>Café Kết Bạn</b> <span class="tag3d">3D</span></div>
-  <div class="top-info"><span id="net-dot" title="Trạng thái kết nối">●</span> <span id="online-count">0/100 đang trong quán</span></div>
-  <div class="top-actions">
-    <button id="btn-tv" title="Mở tivi YouTube">📺 <span>Tivi</span></button>
-    <button id="btn-sound" title="Âm thanh của riêng bạn">🔊 <span>Loa</span></button>
-    <button id="btn-coffee" title="Gọi cà phê">☕ <span>Cà phê</span></button>
-    <button id="btn-cam" title="Đổi góc camera">🎥 <span>Góc nhìn</span></button>
-    <button id="btn-change-char" title="Đổi nhân vật">🧑 <span>Nhân vật</span></button>
-  </div>
-</header>
+  <header class="hero">
+    <h1>🎨 Tạo Ảnh với Muse</h1>
+    <p class="subtitle">Gõ mô tả, gửi đi, Muse tạo ảnh rồi trả về ngay trên trang này. Mỗi ảnh chờ vài phút — cứ để trang mở, ảnh xong sẽ tự hiện.</p>
+    <p id="net-status" class="net-status connecting">● Đang kết nối Firebase…</p>
+  </header>
 
-<aside id="chat-panel">
-  <div id="chat-log"></div>
-  <div id="chat-input-row">
-    <input id="chat-input" type="text" maxlength="120" placeholder="Nhắn gì đó với cả quán..." autocomplete="off">
-    <button id="chat-send">Gửi</button>
-  </div>
-</aside>
-<button id="btn-chat-toggle" title="Mở chat">💬</button>
-
-<!-- Joystick di chuyển (chỉ hiện trên điện thoại/cảm ứng) + nút Ngồi/Đứng dậy -->
-<div id="joystick" class="hidden"><div id="joy-knob"></div></div>
-<button id="btn-sit" class="hidden">🪑 Ngồi xuống</button>
-
-<div id="hint">🖱️ Kéo để xoay quán &nbsp;•&nbsp; Lăn chuột để zoom &nbsp;•&nbsp; WASD để đi &nbsp;•&nbsp; Lại gần ghế trống rồi bấm 🪑 để ngồi &nbsp;•&nbsp; Bấm vào người khác để làm quen</div>
-<div id="zone-label"></div>
-
-<div id="profile" class="hidden">
-  <button id="profile-close">✕</button>
-  <div id="profile-color"></div>
-  <h3 id="profile-name">—</h3>
-  <p id="profile-desc">—</p>
-  <div class="profile-actions">
-    <button id="btn-hello">👋 Chào</button>
-    <button id="btn-friend">🤝 Kết bạn</button>
-  </div>
-</div>
-
-<div id="tv-panel" class="hidden">
-  <div class="tv-head">
-    <b>📺 Tivi quán</b>
-    <button id="tv-close">✕ Đóng</button>
-  </div>
-  <iframe id="tv-frame" src="https://www.youtube-nocookie.com/embed/jfKfPfyJRdk?autoplay=1&mute=1&controls=0&disablekb=1&modestbranding=1&cc_load_policy=0&iv_load_policy=3" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-  <div class="tv-controls">
-    <input id="tv-url" type="text" placeholder="Dán link YouTube để thêm vào hàng chờ...">
-    <button id="tv-play">+ Thêm vào hàng chờ</button>
-  </div>
-  <div class="tv-volume-row">
-    <button id="tv-mute" title="Bật/tắt tiếng của bạn">🔊</button>
-    <input id="tv-volume" type="range" min="0" max="100" value="60">
-    <span id="tv-volume-label">Âm lượng: 60%</span>
-    <button id="tv-skip">⏭ Bài tiếp</button>
-  </div>
-  <div id="tv-queue"></div>
-</div>
-
-<div id="welcome">
-  <div class="welcome-card">
-    <h1>☕ Café Kết Bạn <span class="tag3d">3D</span></h1>
-    <p class="welcome-sub">Quán cà phê 3D cho 100 người — chọn nhân vật, vào quán, ngồi xuống và làm quen!</p>
-    <div class="welcome-main">
-      <div class="welcome-char">
-        <label class="field-label">Chọn nhân vật 3D</label>
-        <div id="char-preview-wrap"><canvas id="char-preview" width="280" height="280"></canvas></div>
-        <div id="char-grid"></div>
-        <label class="field-label" id="outfit-label">Chọn trang phục</label>
-        <div id="outfit-grid"></div>
-      </div>
-      <div class="welcome-form">
-        <label class="field-label">Tên của bạn</label>
-        <div class="name-row">
-          <input id="player-name" type="text" maxlength="20" placeholder="Nhập tên của bạn...">
-          <button id="btn-random">🎲 Ngẫu nhiên</button>
-        </div>
-        <button id="btn-enter">Vào quán →</button>
-        <button id="btn-install" class="hidden">📲 Cài đặt game</button>
-        <p class="welcome-note">Chưa cần đăng nhập • Quán có 100 ghế: sảnh chính, sân vườn, lounge</p>
-      </div>
+  <main>
+    <!-- Chế độ -->
+    <div class="mode-tabs" role="tablist">
+      <button id="tab-generate" class="mode-tab active" type="button">✨ Tạo ảnh mới</button>
+      <button id="tab-edit" class="mode-tab" type="button">🖼️ Chỉnh ảnh có sẵn</button>
     </div>
-  </div>
+
+    <section class="card form-card">
+      <!-- Upload ảnh (chỉ hiện ở chế độ chỉnh ảnh) -->
+      <div id="upload-box" class="upload-box hidden">
+        <label class="upload-label" for="file-input">📁 Chọn ảnh cần chỉnh</label>
+        <input id="file-input" type="file" accept="image/*" hidden>
+        <p class="hint">Ảnh JPG/PNG, tối đa 5MB. Ảnh sẽ được thu nhỏ về tối đa 1024px trước khi gửi.</p>
+        <div id="upload-preview" class="upload-preview hidden">
+          <img id="preview-img" alt="Ảnh đã chọn">
+          <div class="preview-meta">
+            <span id="preview-name"></span>
+            <button id="btn-remove-img" class="btn-link" type="button">✕ Bỏ ảnh</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mô tả -->
+      <label class="field-label" for="prompt-input" id="prompt-label">Mô tả ảnh bạn muốn tạo</label>
+      <textarea id="prompt-input" rows="4" maxlength="500"
+        placeholder="Ví dụ: Một chú rồng con màu xanh đang bay trên đảo nhiệt đới lúc hoàng hôn…"></textarea>
+      <div class="char-count"><span id="char-count">0</span>/500</div>
+
+      <!-- Phong cách -->
+      <p class="field-label">Phong cách</p>
+      <div class="chips" id="style-chips">
+        <button class="chip active" type="button" data-style="real">📷 Ảnh thật</button>
+        <button class="chip" type="button" data-style="anime">🌸 Anime</button>
+        <button class="chip" type="button" data-style="3d">🧊 Hoạt hình 3D</button>
+        <button class="chip" type="button" data-style="painting">🖌️ Tranh vẽ</button>
+      </div>
+
+      <!-- Tỉ lệ -->
+      <p class="field-label">Tỉ lệ ảnh</p>
+      <div class="chips" id="size-chips">
+        <button class="chip active" type="button" data-size="square">⬜ Vuông 1:1</button>
+        <button class="chip" type="button" data-size="portrait">▯ Dọc 9:16</button>
+        <button class="chip" type="button" data-size="landscape">▭ Ngang 16:9</button>
+      </div>
+
+      <p id="form-error" class="form-error hidden"></p>
+      <button id="btn-generate" class="btn-primary" type="button" disabled>✨ Tạo ảnh</button>
+      <p id="form-ok" class="form-ok hidden">✅ Đã gửi yêu cầu! Ảnh xong sẽ tự hiện bên dưới.</p>
+    </section>
+
+    <!-- Danh sách yêu cầu -->
+    <section class="list-section">
+      <h2>🖼️ Ảnh của bạn</h2>
+      <p id="list-empty" class="list-empty">Chưa có yêu cầu nào. Gõ mô tả rồi bấm “Tạo ảnh” nhé.</p>
+      <div id="requests-list" class="requests-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Tool tạo ảnh — yêu cầu đi qua Firebase, Muse tạo ảnh rồi trả về trang này. Không cần API key.</p>
+  </footer>
 </div>
 
-<div id="rotate-overlay" class="hidden">
-  <div class="rotate-box">
-    <div class="rotate-phone">📱</div>
-    <h2>Xoay ngang điện thoại để chơi</h2>
-    <p>Game chơi tốt nhất ở màn hình ngang</p>
-  </div>
-</div>
-
-<div id="toast" class="hidden"></div>
-
-<div id="ios-install" class="hidden">
-  <div class="ios-install-card">
-    <h3>📲 Cài đặt game trên iPhone</h3>
-    <p class="ios-install-sub">iPhone không cho cài trực tiếp như Android, làm theo 3 bước sau là có icon game trên màn hình chính:</p>
-    <ol class="ios-install-steps">
-      <li>Bấm nút <b>Chia sẻ ⤴️</b> ở thanh công cụ dưới cùng của Safari</li>
-      <li>Cuộn xuống, chọn <b>"Thêm vào Màn hình chính"</b></li>
-      <li>Bấm <b>"Thêm"</b> ở góc phải trên — xong!</li>
-    </ol>
-    <p class="ios-install-note">Sau đó mở game từ icon trên màn hình chính, chơi như app thật (xoay ngang, toàn màn hình).</p>
-    <p class="ios-install-note hidden" id="ios-install-nonsafari">⚠️ Bạn đang mở bằng trình duyệt khác, nút "Thêm vào Màn hình chính" chỉ có trên <b>Safari</b>. Hãy mở link này bằng Safari rồi bấm Cài đặt lại.</p>
-    <button id="ios-install-close">Đã hiểu</button>
-  </div>
-</div>
-
-<script src="./vendor/firebase-app-compat.js"></script>
-<script src="./vendor/firebase-database-compat.js"></script>
-<script type="module" src="app.js"></script>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-database-compat.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
