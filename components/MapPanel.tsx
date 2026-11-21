@@ -1,8 +1,7 @@
 "use client";
 
-import { MapPin } from "lucide-react";
 import { ITEM_MAP, ZONES, ZONE_MAP } from "@/lib/config";
-import { CUSTOMER_AVATARS, MAP_BG, MERCHANT_AVATARS } from "@/lib/images";
+import { CUSTOMER_AVATARS, MAP_BG, MERCHANT_AVATARS, PLAYER_SPRITE } from "@/lib/images";
 import type { StateResponse, ZoneId } from "@/lib/types";
 import { ZoneImage } from "./ItemImage";
 
@@ -64,15 +63,15 @@ export default function MapPanel({
   now,
   busy,
   onTravel,
-  onGoToCustomers,
-  onGoToMerchants,
+  onOpenMerchant,
+  onOpenCustomer,
 }: {
   state: StateResponse;
   now: number;
   busy: boolean;
   onTravel: (to: ZoneId) => void;
-  onGoToCustomers?: () => void;
-  onGoToMerchants?: () => void;
+  onOpenMerchant: (waveIndex: number, merchantIdx: number) => void;
+  onOpenCustomer: (waveIndex: number, customerIdx: number) => void;
 }) {
   const { player, waves } = state;
   const travel = player.travel;
@@ -90,150 +89,149 @@ export default function MapPanel({
   const customerSpots = CUSTOMER_SPOTS[player.zone];
 
   return (
-    <section className="rounded-3xl border-2 border-sky-100 bg-white p-4 shadow-[0_6px_0_rgba(56,189,248,0.18)]">
+    <section className="relative h-full overflow-hidden">
       <style>{`@keyframes walk-in { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }`}</style>
-      <h2 className="flex items-center gap-2 text-lg font-extrabold text-sky-700">
-        <MapPin className="h-5 w-5" /> Bản Đồ Xóm Nhỏ
-      </h2>
-      <p className="mt-1 text-xs font-bold text-gray-500">
-        Vùng liền kề 30s • Đi chéo 50s • Túi trống chỉ 4s đi dạo. Bấm vào khu để chạy tới, bấm vào khách/thương lái để mở chợ nha!
-      </p>
 
-      {/* Khung bản đồ 2D */}
-      <div className="relative mt-3 aspect-square overflow-hidden rounded-3xl border-2 border-sky-100 sm:aspect-[16/10]">
-        <img src={MAP_BG} alt="Bản đồ xóm nhỏ" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+      {/* Nền bản đồ 2D lấp đầy cả khung */}
+      <img src={MAP_BG} alt="Bản đồ xóm nhỏ" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
 
-        {/* Nút 4 khu vực */}
-        {ZONES.map((z) => {
-          const isHere = player.zone === z.id;
-          const isDest = travel?.to === z.id;
+      {/* Nút 4 khu vực */}
+      {ZONES.map((z) => {
+        const isHere = player.zone === z.id;
+        const isDest = travel?.to === z.id;
+        return (
+          <button
+            key={z.id}
+            disabled={isHere || !!travel || busy}
+            onClick={() => onTravel(z.id)}
+            title={`${z.name} — ${z.desc}`}
+            className="absolute z-10 -translate-x-1/2 -translate-y-1/2 transition active:scale-95 disabled:opacity-100"
+            style={{ left: `${zoneLeft(z.x)}%`, top: `${zoneTop(z.y)}%` }}
+          >
+            <span className={`block h-16 w-16 overflow-hidden rounded-2xl border-2 bg-white shadow-md sm:h-20 sm:w-20 ${isHere ? "border-pink-400 ring-2 ring-pink-300" : "border-white"}`}>
+              <ZoneImage zoneId={z.id} emoji={z.emoji} className="h-full w-full object-cover" />
+            </span>
+            <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/90 px-1.5 py-0.5 text-[11px] font-extrabold text-gray-700 shadow">
+              {z.emoji} {SHORT_NAMES[z.id]}
+            </span>
+            {isHere && (
+              <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-pink-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow">
+                📍 Bạn ở đây
+              </span>
+            )}
+            {isDest && (
+              <span className="absolute -right-2 -top-2 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow">
+                🚚
+              </span>
+            )}
+          </button>
+        );
+      })}
+
+      {/* Sạp thương lái quanh quảng trường — bấm để mở sheet đúng thương lái đó */}
+      <div key={`m-${waves?.merchant?.waveIndex ?? 0}`} className="absolute inset-0">
+        {merchants.map((m, i) => {
+          const spot = MERCHANT_SPOTS[i % MERCHANT_SPOTS.length];
           return (
             <button
-              key={z.id}
-              disabled={isHere || !!travel || busy}
-              onClick={() => onTravel(z.id)}
-              title={`${z.name} — ${z.desc}`}
-              className="absolute z-10 -translate-x-1/2 -translate-y-1/2 transition active:scale-95 disabled:opacity-100"
-              style={{ left: `${zoneLeft(z.x)}%`, top: `${zoneTop(z.y)}%` }}
+              key={m.id}
+              onClick={() => onOpenMerchant(waves.merchant.waveIndex, i)}
+              title={`${m.name} — bấm để xem hàng của ${m.name}`}
+              className="absolute z-10 transition active:scale-95"
+              style={{ left: `calc(${spot.left}% - 20px)`, top: `calc(${spot.top}% - 20px)` }}
             >
-              <span className={`block h-16 w-16 overflow-hidden rounded-2xl border-2 bg-white shadow-md sm:h-20 sm:w-20 ${isHere ? "border-pink-400 ring-2 ring-pink-300" : "border-white"}`}>
-                <ZoneImage zoneId={z.id} emoji={z.emoji} className="h-full w-full object-cover" />
+              <span className="block h-10 w-10 overflow-hidden rounded-full border-2 border-amber-200 bg-white shadow-md">
+                <img
+                  src={MERCHANT_AVATARS[i % MERCHANT_AVATARS.length]}
+                  alt={m.name}
+                  className="h-full w-full animate-bounce object-cover"
+                  style={{ animationDelay: `${i * 0.25}s` }}
+                  draggable={false}
+                />
               </span>
-              <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/90 px-1.5 py-0.5 text-[11px] font-extrabold text-gray-700 shadow">
-                {z.emoji} {SHORT_NAMES[z.id]}
+              <span className="absolute left-1/2 top-full mt-0.5 max-w-20 -translate-x-1/2 truncate whitespace-nowrap rounded-full bg-white/90 px-1 py-0.5 text-[10px] font-extrabold text-amber-700 shadow">
+                {m.name}
               </span>
-              {isHere && (
-                <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-pink-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow">
-                  📍 Bạn ở đây
-                </span>
-              )}
-              {isDest && (
-                <span className="absolute -right-2 -top-2 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow">
-                  🚚
-                </span>
-              )}
             </button>
           );
         })}
-
-        {/* Sạp thương lái quanh quảng trường */}
-        <div key={`m-${waves?.merchant?.waveIndex ?? 0}`} className="absolute inset-0">
-          {merchants.map((m, i) => {
-            const spot = MERCHANT_SPOTS[i % MERCHANT_SPOTS.length];
-            return (
-              <button
-                key={m.id}
-                onClick={onGoToMerchants}
-                title={`${m.name} — bấm để mở tab Thương lái`}
-                className="absolute z-10 transition active:scale-95"
-                style={{ left: `calc(${spot.left}% - 20px)`, top: `calc(${spot.top}% - 20px)` }}
-              >
-                <span className="block h-10 w-10 overflow-hidden rounded-full border-2 border-amber-200 bg-white shadow-md">
-                  <img
-                    src={MERCHANT_AVATARS[i % MERCHANT_AVATARS.length]}
-                    alt={m.name}
-                    className="h-full w-full object-cover animate-bounce"
-                    style={{ animationDelay: `${i * 0.25}s` }}
-                    draggable={false}
-                  />
-                </span>
-                <span className="absolute left-1/2 top-full mt-0.5 max-w-20 -translate-x-1/2 truncate whitespace-nowrap rounded-full bg-white/90 px-1 py-0.5 text-[10px] font-extrabold text-amber-700 shadow">
-                  {m.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Khách ra vào quanh khu người chơi */}
-        <div key={`c-${waves?.customer?.waveIndex ?? 0}`} className="absolute inset-0">
-          {customers.map((c, i) => {
-            const spot = customerSpots[i % customerSpots.length];
-            const left = spot.left;
-            const top = spot.top;
-            const item = ITEM_MAP[c.offer.itemId];
-            const served = servedCustomers.includes(c.offer.id);
-            return (
-              <button
-                key={c.id}
-                onClick={onGoToCustomers}
-                title={`${c.name} muốn mua ${item?.name ?? ""} x${c.offer.qty} — bấm để mở tab Khách mua`}
-                className={`absolute z-10 transition active:scale-95 ${served ? "opacity-60" : ""}`}
-                style={{ left: `calc(${left}% - 20px)`, top: `calc(${top}% - 20px)`, animation: `walk-in 1s ease-out ${i * 0.15}s both` }}
-              >
-                <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-pink-200 bg-white/95 px-1.5 py-0.5 text-[11px] font-extrabold text-gray-700 shadow">
-                  {item?.emoji ?? "🛍️"} ×{c.offer.qty}
-                </span>
-                <span className="relative block h-10 w-10 overflow-hidden rounded-full border-2 border-white bg-white shadow-md">
-                  <img
-                    src={CUSTOMER_AVATARS[i % CUSTOMER_AVATARS.length]}
-                    alt={c.name}
-                    className="h-full w-full object-cover animate-bounce"
-                    style={{ animationDelay: `${i * 0.2}s` }}
-                    draggable={false}
-                  />
-                  {served && (
-                    <span className="absolute -right-1 -top-1 text-sm" title="Đã phục vụ rồi">
-                      💖
-                    </span>
-                  )}
-                </span>
-                <span className="absolute left-1/2 top-full mt-0.5 max-w-20 -translate-x-1/2 truncate whitespace-nowrap rounded-full bg-white/90 px-1 py-0.5 text-[10px] font-extrabold text-pink-600 shadow">
-                  {c.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Marker người chơi */}
-        <div
-          className="absolute z-30 -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-linear"
-          style={{ left: `${markerLeft}%`, top: `${markerTop}%` }}
-          title={player.nickname}
-        >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-pink-500 bg-white text-lg shadow-lg">🧺</span>
-          <span className="absolute left-1/2 top-full mt-0.5 -translate-x-1/2 whitespace-nowrap rounded-full bg-pink-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow">
-            Bạn
-          </span>
-        </div>
       </div>
 
-      {/* Thông tin rẻ/đắt từng khu (giữ lại từ bản cũ) */}
-      <div className="mt-3 space-y-2">
-        {ZONES.map((z) => {
-          const cheapNames = Object.keys(z.cheap).map((id) => ITEM_MAP[id]?.name ?? id);
-          const bonusNames = Object.keys(z.sellBonus).map((id) => ITEM_MAP[id]?.name ?? id);
+      {/* Khách ra vào quanh khu người chơi — bấm để mở sheet đúng khách đó */}
+      <div key={`c-${waves?.customer?.waveIndex ?? 0}`} className="absolute inset-0">
+        {customers.map((c, i) => {
+          const spot = customerSpots[i % customerSpots.length];
+          const left = spot.left;
+          const top = spot.top;
+          const item = ITEM_MAP[c.offer.itemId];
+          const served = servedCustomers.includes(c.offer.id);
           return (
-            <div key={z.id} className="rounded-2xl bg-sky-50/70 px-3 py-2 text-xs font-bold text-gray-600">
-              <span className="font-extrabold text-gray-800">
-                {z.emoji} {z.name}
+            <button
+              key={c.id}
+              onClick={() => onOpenCustomer(waves.customer.waveIndex, i)}
+              title={`${c.name} muốn mua ${item?.name ?? ""} x${c.offer.qty} — bấm để bán cho ${c.name}`}
+              className={`absolute z-10 transition active:scale-95 ${served ? "opacity-60" : ""}`}
+              style={{ left: `calc(${left}% - 20px)`, top: `calc(${top}% - 20px)`, animation: `walk-in 1s ease-out ${i * 0.15}s both` }}
+            >
+              <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-pink-200 bg-white/95 px-1.5 py-0.5 text-[11px] font-extrabold text-gray-700 shadow">
+                {item?.emoji ?? "🛍️"} ×{c.offer.qty}
               </span>
-              {cheapNames.length > 0 && <span> • Rẻ: {cheapNames.join(", ")}</span>}
-              {bonusNames.length > 0 && <span> • Bán đắt: {bonusNames.join(", ")}</span>}
-              {z.buyAll !== 1 && <span> • Nhập hàng ×{z.buyAll}</span>}
-              {z.sellAll !== 1 && <span> • Bán +{Math.round((z.sellAll - 1) * 100)}%</span>}
-            </div>
+              <span className="relative block h-10 w-10 overflow-hidden rounded-full border-2 border-white bg-white shadow-md">
+                <img
+                  src={CUSTOMER_AVATARS[i % CUSTOMER_AVATARS.length]}
+                  alt={c.name}
+                  className="h-full w-full animate-bounce object-cover"
+                  style={{ animationDelay: `${i * 0.2}s` }}
+                  draggable={false}
+                />
+                {served && (
+                  <span className="absolute -right-1 -top-1 text-sm" title="Đã phục vụ rồi">
+                    💖
+                  </span>
+                )}
+              </span>
+              <span className="absolute left-1/2 top-full mt-0.5 max-w-20 -translate-x-1/2 truncate whitespace-nowrap rounded-full bg-white/90 px-1 py-0.5 text-[10px] font-extrabold text-pink-600 shadow">
+                {c.name}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Marker người chơi: ảnh nhân vật tròn, trượt dần khi di chuyển */}
+      <div
+        className="absolute z-30 -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-linear"
+        style={{ left: `${markerLeft}%`, top: `${markerTop}%` }}
+        title={player.nickname}
+      >
+        <img
+          src={PLAYER_SPRITE}
+          alt={player.nickname}
+          className="h-11 w-11 rounded-full border-2 border-pink-500 bg-white object-cover shadow-lg"
+          draggable={false}
+        />
+        <span className="absolute left-1/2 top-full mt-0.5 -translate-x-1/2 whitespace-nowrap rounded-full bg-pink-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow">
+          Bạn
+        </span>
+      </div>
+
+      {/* Dải thông tin rẻ/bán đắt từng khu — phủ dưới map, cuộn ngang */}
+      <div className="absolute bottom-2 left-2 right-2 z-20 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {ZONES.map((z) => {
+          const cheapEmojis = Object.keys(z.cheap)
+            .map((id) => ITEM_MAP[id]?.emoji ?? "")
+            .join("");
+          const bonusEmojis = Object.keys(z.sellBonus)
+            .map((id) => ITEM_MAP[id]?.emoji ?? "")
+            .join("");
+          return (
+            <span key={z.id} className="shrink-0 whitespace-nowrap rounded-full border border-sky-100 bg-white/90 px-2 py-1 text-[10px] font-extrabold text-gray-600 shadow backdrop-blur">
+              {z.emoji} {SHORT_NAMES[z.id]}
+              {cheapEmojis && <span> · Rẻ {cheapEmojis}</span>}
+              {bonusEmojis && <span> · Bán {bonusEmojis}</span>}
+              {z.buyAll !== 1 && <span> · Nhập ×{z.buyAll}</span>}
+              {z.sellAll !== 1 && <span> · Bán +{Math.round((z.sellAll - 1) * 100)}%</span>}
+            </span>
           );
         })}
       </div>

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { CUTE_NAMES, ZONES } from "@/lib/config";
+import { CUSTOMER_AVATARS, MERCHANT_AVATARS } from "@/lib/images";
 import { playSound, type SoundKind } from "@/lib/sound";
 import type { GameEvent, StateResponse, ZoneId } from "@/lib/types";
 import TownCrier from "@/components/TownCrier";
@@ -23,6 +24,8 @@ import GaragePanel from "@/components/GaragePanel";
 import StaffPanel from "@/components/StaffPanel";
 import LeaderboardPanel from "@/components/LeaderboardPanel";
 import ShopPanel from "@/components/ShopPanel";
+import Sheet from "@/components/Sheet";
+import { FocusedCustomer, FocusedMerchant } from "@/components/FocusedTrade";
 
 interface Toast {
   id: string;
@@ -37,6 +40,18 @@ const toastStyle: Record<Toast["kind"], string> = {
   quest: "border-violet-200 bg-violet-50 text-violet-800",
   level: "border-yellow-200 bg-yellow-50 text-yellow-800",
 };
+
+// Sheet đang mở trên bản đồ: null = không mở gì (chỉ thấy map).
+type SheetKind =
+  | { kind: "market" }
+  | { kind: "bag" }
+  | { kind: "quests" }
+  | { kind: "leaderboard" }
+  | { kind: "garage" }
+  | { kind: "staff" }
+  | { kind: "shop" }
+  | { kind: "merchant"; waveIndex: number; merchantIdx: number }
+  | { kind: "customer"; waveIndex: number; customerIdx: number };
 
 export default function Home() {
   const [playerId, setPlayerId] = useState<string | null>(() =>
@@ -58,39 +73,16 @@ export default function Home() {
   const [authTab, setAuthTab] = useState<"guest" | "register" | "login">("guest");
   const [accountUser, setAccountUser] = useState<string | null>(null);
 
-  // Tab điều hướng chính (mobile không phải kéo dài): lưu tab đang chọn để mở lại đúng chỗ.
-  type TabId = "cho" | "tui" | "map" | "quests" | "leaderboard" | "garage" | "staff" | "shop";
-  const TABS: { id: TabId; label: string; emoji: string }[] = [
-    { id: "cho", label: "Chợ", emoji: "🛒" },
-    { id: "tui", label: "Túi", emoji: "🎒" },
-    { id: "map", label: "Bản đồ", emoji: "🗺️" },
-    { id: "quests", label: "Nhiệm vụ", emoji: "📋" },
-    { id: "leaderboard", label: "BXH", emoji: "🏆" },
-    { id: "garage", label: "Gara", emoji: "🚚" },
-    { id: "staff", label: "Nhân viên", emoji: "🐾" },
-    { id: "shop", label: "Shop", emoji: "🛍️" },
-  ];
-  const [activeTab, setActiveTab] = useState<TabId>(() => {
-    if (typeof window === "undefined") return "cho";
-    const saved = localStorage.getItem("tmcc_tab");
-    return TABS.some((t) => t.id === saved) ? (saved as TabId) : "cho";
-  });
-  const switchTab = (tab: TabId) => {
-    setActiveTab(tab);
-    localStorage.setItem("tmcc_tab", tab);
-    window.scrollTo({ top: 0 });
-  };
-  // Tab con của chợ (nâng từ MarketBoard lên để bấm khách/thương lái trên bản đồ
-  // cũng mở đúng tab con).
+  // Map-first: không còn tab nữa, mọi panel mở bằng bottom sheet phủ lên map.
+  const [sheet, setSheet] = useState<SheetKind | null>(null);
+  // Tracker nhiệm vụ trên map: mặc định thu gọn thành pill nhỏ, bấm để xem 3 đơn.
+  const [questOpen, setQuestOpen] = useState(false);
+  // Tab con của chợ (mở sheet chợ vẫn nhớ đúng tab con).
   const [marketSubTab, setMarketSubTab] = useState<MarketSubTab>("merchant");
-  const goToCustomers = () => {
-    setMarketSubTab("customer");
-    switchTab("cho");
-  };
-  const goToMerchants = () => {
-    setMarketSubTab("merchant");
-    switchTab("cho");
-  };
+  const openMerchant = (waveIndex: number, merchantIdx: number) =>
+    setSheet({ kind: "merchant", waveIndex, merchantIdx });
+  const openCustomer = (waveIndex: number, customerIdx: number) =>
+    setSheet({ kind: "customer", waveIndex, customerIdx });
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState("");
@@ -290,6 +282,12 @@ export default function Home() {
       return res;
     }, "click");
 
+  // Mua/bán trong sheet tập trung: thành công thì đóng sheet để lộ map.
+  const doTradeFocused = async (action: "buy_merchant" | "sell_customer", waveIndex: number, offerId: string) => {
+    const res = await doTrade(action, waveIndex, offerId);
+    if (res) setSheet(null);
+  };
+
   const doTravel = (to: ZoneId) =>
     act(async () => {
       const res = await api.travel(playerIdRef.current!, to);
@@ -347,7 +345,7 @@ export default function Home() {
     if (next) playSound("click", true);
   };
 
-  // Dữ liệu cho badge trên thanh tab + banner di chuyển.
+  // Dữ liệu cho badge thanh icon dưới + banner di chuyển + tracker nhiệm vụ.
   const bagCount = state ? state.player.inventory.reduce((s, l) => s + l.qty, 0) : 0;
   const questsReady = state ? state.player.quests.filter((q) => q.done && !q.claimed).length : 0;
   const merchantCountdown = state
@@ -361,29 +359,62 @@ export default function Home() {
   const travelProgress = travel ? Math.min(1, Math.max(0, (now - travel.startedAt) / travel.durationMs)) : 0;
   const travelSecs = travel ? Math.max(0, Math.ceil((travel.endsAt - now) / 1000)) : 0;
 
+  const NAV: { id: string; label: string; emoji: string; badge: string | null; sub: string | null; sheet: SheetKind }[] = [
+    { id: "market", label: "Chợ", emoji: "🛒", badge: null, sub: merchantCountdown, sheet: { kind: "market" } },
+    { id: "bag", label: "Túi", emoji: "🎒", badge: bagCount > 0 ? String(bagCount) : null, sub: null, sheet: { kind: "bag" } },
+    { id: "quests", label: "Nhiệm vụ", emoji: "📋", badge: questsReady > 0 ? String(questsReady) : null, sub: null, sheet: { kind: "quests" } },
+    { id: "leaderboard", label: "BXH", emoji: "🏆", badge: null, sub: null, sheet: { kind: "leaderboard" } },
+    { id: "garage", label: "Gara", emoji: "🚚", badge: null, sub: null, sheet: { kind: "garage" } },
+    { id: "staff", label: "Nhân viên", emoji: "🐾", badge: null, sub: null, sheet: { kind: "staff" } },
+    { id: "shop", label: "Shop", emoji: "🛍️", badge: null, sub: null, sheet: { kind: "shop" } },
+  ];
+
+  const sheetTitle =
+    !state || !sheet
+      ? ""
+      : sheet.kind === "market"
+        ? "🛒 Chợ Xóm Nhỏ"
+        : sheet.kind === "bag"
+          ? "🎒 Túi Mù Của Bạn"
+          : sheet.kind === "quests"
+            ? "📋 Đơn Hàng Xóm Nhỏ"
+            : sheet.kind === "leaderboard"
+              ? "🏆 Bảng Xếp Hạng"
+              : sheet.kind === "garage"
+                ? "🚚 Gara Xe Chạy Chợ"
+                : sheet.kind === "staff"
+                  ? "🐾 Đội Nhân Viên"
+                  : sheet.kind === "shop"
+                    ? "🛍️ Shop Xóm Nhỏ"
+                    : sheet.kind === "merchant"
+                      ? `${state.waves.merchant.merchants[sheet.merchantIdx]?.emoji ?? "🛒"} ${state.waves.merchant.merchants[sheet.merchantIdx]?.name ?? "Thương lái"}`
+                      : `${state.waves.customer.customers[sheet.customerIdx]?.emoji ?? "🧑"} ${state.waves.customer.customers[sheet.customerIdx]?.name ?? "Khách mua"}`;
+
   return (
-    <main className="min-h-screen bg-[#FFFBF5] pb-10 text-gray-800">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b-2 border-pink-100 bg-[#FFFBF5]/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+    <main className="flex h-dvh flex-col overflow-hidden bg-[#FFFBF5] text-gray-800">
+      {/* Header gọn: chỉ tiêu đề + Xu + tài sản + cấp + biệt danh + âm thanh + tài khoản */}
+      <header className="flex-none border-b-2 border-pink-100 bg-gradient-to-b from-pink-100 to-[#FFFBF5]">
+        <div className="mx-auto max-w-7xl px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-3xl">🧺</span>
             <div>
               <h1 className="text-xl font-black leading-none text-pink-600">TÚI MÙ CHẠY CHỢ</h1>
               <p className="hidden text-[11px] font-bold text-pink-400 sm:block">Buôn bán dễ thương • Chạy hàng vui vẻ ^w^</p>
             </div>
-          </div>
-          {state && (
-            <>
-              <div className="ml-auto flex items-center gap-2 rounded-full border-2 border-amber-200 bg-white px-3 py-1.5 shadow-sm">
+            {state && (
+              <div className="ml-auto flex shrink-0 items-center gap-2 rounded-full border-2 border-amber-200 bg-white px-3 py-1.5 shadow-sm">
                 <Coins className="h-4 w-4 text-amber-500" />
                 <span className="font-extrabold text-amber-700">{state.player.xu.toLocaleString("vi-VN")} Xu</span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border-2 border-pink-200 bg-white px-3 py-1.5 shadow-sm" title="Tổng tài sản ròng">
+            )}
+          </div>
+          {state && (
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex shrink-0 items-center gap-2 rounded-full border-2 border-pink-200 bg-white px-3 py-1.5 shadow-sm" title="Tổng tài sản ròng">
                 <Wallet className="h-4 w-4 text-pink-500" />
                 <span className="font-extrabold text-pink-700">{state.netWorth.toLocaleString("vi-VN")} Xu</span>
               </div>
-              <div className="flex min-w-44 items-center gap-2 rounded-full border-2 border-violet-200 bg-white px-3 py-1.5 shadow-sm">
+              <div className="flex min-w-44 shrink-0 items-center gap-2 rounded-full border-2 border-violet-200 bg-white px-3 py-1.5 shadow-sm">
                 <Sparkles className="h-4 w-4 shrink-0 text-violet-500" />
                 <div className="min-w-0">
                   <div className="truncate text-xs font-extrabold text-violet-700">
@@ -397,7 +428,7 @@ export default function Home() {
                   {state.levelInfo.expForNext ? `${state.levelInfo.exp}/${state.levelInfo.expForNext} EXP` : "MAX"}
                 </span>
               </div>
-              <div className="flex items-center gap-1 rounded-full border-2 border-pink-200 bg-white px-2 py-1.5 shadow-sm">
+              <div className="flex shrink-0 items-center gap-1 rounded-full border-2 border-pink-200 bg-white px-2 py-1.5 shadow-sm">
                 <Heart className="h-4 w-4 text-pink-500" />
                 {editingName ? (
                   <span className="flex items-center gap-1">
@@ -427,7 +458,7 @@ export default function Home() {
               <button
                 onClick={toggleSound}
                 title={soundOn ? "Tắt âm thanh" : "Bật âm thanh"}
-                className="rounded-full border-2 border-pink-200 bg-white p-2 text-pink-600 shadow-sm transition active:translate-y-0.5"
+                className="shrink-0 rounded-full border-2 border-pink-200 bg-white p-2 text-pink-600 shadow-sm transition active:translate-y-0.5"
               >
                 {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </button>
@@ -435,7 +466,7 @@ export default function Home() {
                 <button
                   onClick={doLogout}
                   title={`Đang đăng nhập: ${accountUser} — bấm để đăng xuất`}
-                  className="rounded-full border-2 border-violet-200 bg-white px-3 py-1.5 text-xs font-extrabold text-violet-700 shadow-sm transition active:translate-y-0.5"
+                  className="shrink-0 rounded-full border-2 border-violet-200 bg-white px-3 py-1.5 text-xs font-extrabold text-violet-700 shadow-sm transition active:translate-y-0.5"
                 >
                   @{accountUser} • Đăng xuất
                 </button>
@@ -447,48 +478,14 @@ export default function Home() {
                     setShowNameModal(true);
                   }}
                   title="Tạo tài khoản để giữ tiến trình mãi mãi, đổi máy vẫn chơi tiếp"
-                  className="rounded-full border-2 border-violet-200 bg-violet-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm transition active:translate-y-0.5"
+                  className="shrink-0 rounded-full border-2 border-violet-200 bg-violet-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm transition active:translate-y-0.5"
                 >
                   Tạo tài khoản
                 </button>
               )}
-            </>
+            </div>
           )}
         </div>
-        {state && (
-          <nav className="mx-auto max-w-7xl px-4 pb-2">
-            <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {TABS.map((t) => {
-                const active = activeTab === t.id;
-                const badge =
-                  t.id === "tui" && bagCount > 0
-                    ? String(bagCount)
-                    : t.id === "quests" && questsReady > 0
-                      ? String(questsReady)
-                      : t.id === "cho"
-                        ? merchantCountdown
-                        : null;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => switchTab(t.id)}
-                    className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border-2 px-3 py-1.5 text-sm font-extrabold transition active:translate-y-0.5 ${
-                      active ? "border-pink-500 bg-pink-500 text-white shadow-[0_3px_0_rgba(190,24,93,0.4)]" : "border-pink-200 bg-white text-pink-600"
-                    }`}
-                  >
-                    <span>{t.emoji}</span>
-                    <span>{t.label}</span>
-                    {badge && (
-                      <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-black leading-none ${active ? "bg-white/25 text-white" : "bg-pink-100 text-pink-600"}`}>
-                        {badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-        )}
         {travel && travelDest && (
           <div className="mx-auto max-w-7xl px-4 pb-2">
             <div className="rounded-2xl border-2 border-sky-200 bg-sky-50 px-3 py-2">
@@ -503,30 +500,158 @@ export default function Home() {
         )}
       </header>
 
-      <div className="mx-auto max-w-7xl space-y-4 px-4 pt-4">
-        {state && <TownCrier market={state.market} now={now} />}
+      {/* Dải thông báo thời tiết / sự kiện: mỏng, dưới header */}
+      {state && (
+        <div className="mx-auto w-full max-w-7xl flex-none px-3 pt-2">
+          <TownCrier market={state.market} now={now} />
+        </div>
+      )}
 
+      {/* Bản đồ là cả thế giới: lấp đầy chiều cao còn lại */}
+      <div className="relative min-h-0 flex-1">
         {state ? (
           <>
-            {activeTab === "cho" && <MarketBoard state={state} now={now} busy={busy} onTrade={doTrade} subTab={marketSubTab} onSubTabChange={setMarketSubTab} />}
-            {activeTab === "tui" && <BagPanel state={state} now={now} />}
-            {activeTab === "map" && <MapPanel state={state} now={now} busy={busy} onTravel={doTravel} onGoToCustomers={goToCustomers} onGoToMerchants={goToMerchants} />}
-            {activeTab === "quests" && <QuestsPanel state={state} busy={busy} onClaim={(id) => doQuest("claim", id)} onReroll={(id) => doQuest("reroll", id)} />}
-            {activeTab === "leaderboard" && <LeaderboardPanel state={state} />}
-            {activeTab === "garage" && <GaragePanel state={state} busy={busy} onGarage={doGarage} />}
-            {activeTab === "staff" && <StaffPanel state={state} busy={busy} onStaff={(a, t, m) => doStaff(a, t, m)} />}
-            {activeTab === "shop" && <ShopPanel state={state} busy={busy} onShop={doShop} />}
-            <footer className="rounded-3xl border-2 border-pink-100 bg-white/70 px-4 py-3 text-center text-xs font-bold text-gray-400">
-              Giá thị trường đồng bộ cho cả xóm mỗi 10 giây. Chúc bạn buôn may bán đắt! UwU
-            </footer>
+            <MapPanel state={state} now={now} busy={busy} onTravel={doTravel} onOpenMerchant={openMerchant} onOpenCustomer={openCustomer} />
+            {/* Tracker nhiệm vụ: pill nhỏ ở giữa trên của map (không che khu/khách),
+                bấm để mở rộng xem 3 đơn + tiến trình, bấm "Mở tất cả" để mở sheet nhiệm vụ */}
+            <div className="absolute left-1/2 top-2 z-20 w-[min(220px,calc(100%-1rem))] -translate-x-1/2">
+              <button
+                onClick={() => setQuestOpen((o) => !o)}
+                aria-label="Nhiệm vụ của bạn"
+                className="w-full rounded-full border-2 border-violet-200 bg-white/90 px-3 py-1.5 shadow-md backdrop-blur transition active:translate-y-0.5"
+              >
+                <span className="flex items-center justify-between text-xs font-black text-violet-700">
+                  <span>
+                    📋 Nhiệm vụ{questsReady > 0 ? ` • ${questsReady} đơn xong!` : ""}
+                  </span>
+                  <span className="text-violet-400">{questOpen ? "▲" : "▼"}</span>
+                </span>
+              </button>
+              {questOpen && (
+                <div className="mt-1 rounded-2xl border-2 border-violet-200 bg-white/90 p-2 shadow-md backdrop-blur">
+                  <div className="space-y-1">
+                    {state.player.quests.slice(0, 3).map((q) => (
+                      <div key={q.id}>
+                        <div className="flex justify-between gap-2 text-[11px] font-bold text-gray-600">
+                          <span className="truncate">
+                            {q.done && !q.claimed ? "✅ " : ""}
+                            {q.title}
+                          </span>
+                          <span className="shrink-0">
+                            {Math.min(q.progress, q.target)}/{q.target}
+                          </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-violet-100">
+                          <div className="h-full rounded-full bg-violet-400" style={{ width: `${Math.min(1, q.progress / q.target) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setQuestOpen(false);
+                      setSheet({ kind: "quests" });
+                    }}
+                    className="mt-2 w-full rounded-full bg-violet-500 py-1.5 text-xs font-extrabold text-white transition active:translate-y-0.5"
+                  >
+                    Mở tất cả →
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         ) : (
-          <div className="rounded-3xl border-2 border-pink-100 bg-white p-8 text-center">
-            <div className="text-4xl">🌸</div>
-            <p className="mt-2 font-extrabold text-pink-600">Đang mở sạp... nếu chờ lâu quá, thử tải lại trang nha!</p>
+          <div className="flex h-full items-center justify-center p-8">
+            <div className="rounded-3xl border-2 border-pink-100 bg-white p-8 text-center">
+              <div className="text-4xl">🌸</div>
+              <p className="mt-2 font-extrabold text-pink-600">Đang mở sạp... nếu chờ lâu quá, thử tải lại trang nha!</p>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Thanh icon dưới cùng: 7 nút mở sheet phủ lên map */}
+      {state && (
+        <nav className="flex-none border-t-2 border-pink-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+          <div className="mx-auto flex max-w-7xl">
+            {NAV.map((n) => {
+              const active =
+                sheet?.kind === n.id || (n.id === "market" && (sheet?.kind === "merchant" || sheet?.kind === "customer"));
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => setSheet(n.sheet)}
+                  className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-extrabold transition active:translate-y-0.5 ${
+                    active ? "text-pink-600" : "text-gray-500"
+                  }`}
+                >
+                  <span className="relative text-xl leading-none">
+                    {n.emoji}
+                    {n.badge && (
+                      <span className="absolute -right-2.5 -top-1.5 min-w-5 rounded-full bg-pink-500 px-1 py-0.5 text-center text-[10px] font-black leading-none text-white">
+                        {n.badge}
+                      </span>
+                    )}
+                  </span>
+                  <span>{n.label}</span>
+                  {n.sub && <span className="-mt-0.5 text-[9px] font-bold leading-none text-pink-400">{n.sub}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
+      {/* Sheet phủ lên map */}
+      {state && sheet && (
+        <Sheet title={sheetTitle} onClose={() => setSheet(null)}>
+          {sheet.kind === "market" && (
+            <MarketBoard state={state} now={now} busy={busy} onTrade={doTrade} subTab={marketSubTab} onSubTabChange={setMarketSubTab} />
+          )}
+          {sheet.kind === "bag" && <BagPanel state={state} now={now} />}
+          {sheet.kind === "quests" && (
+            <QuestsPanel state={state} busy={busy} onClaim={(id) => doQuest("claim", id)} onReroll={(id) => doQuest("reroll", id)} />
+          )}
+          {sheet.kind === "leaderboard" && <LeaderboardPanel state={state} />}
+          {sheet.kind === "garage" && <GaragePanel state={state} busy={busy} onGarage={doGarage} />}
+          {sheet.kind === "staff" && <StaffPanel state={state} busy={busy} onStaff={(a, t, m) => doStaff(a, t, m)} />}
+          {sheet.kind === "shop" && <ShopPanel state={state} busy={busy} onShop={doShop} />}
+          {sheet.kind === "merchant" &&
+            (() => {
+              const m = state.waves.merchant.merchants[sheet.merchantIdx];
+              if (!m || state.waves.merchant.waveIndex !== sheet.waveIndex) {
+                return <p className="py-4 text-center text-sm font-bold text-gray-500">Đợt này đi rồi, chờ đợt thương lái sau nha!</p>;
+              }
+              return (
+                <FocusedMerchant
+                  state={state}
+                  now={now}
+                  busy={busy}
+                  merchant={m}
+                  avatar={MERCHANT_AVATARS[sheet.merchantIdx % MERCHANT_AVATARS.length]}
+                  onTrade={doTradeFocused}
+                />
+              );
+            })()}
+          {sheet.kind === "customer" &&
+            (() => {
+              const c = state.waves.customer.customers[sheet.customerIdx];
+              if (!c || state.waves.customer.waveIndex !== sheet.waveIndex) {
+                return <p className="py-4 text-center text-sm font-bold text-gray-500">Khách này đi rồi, chờ đợt khách sau nha!</p>;
+              }
+              return (
+                <FocusedCustomer
+                  state={state}
+                  now={now}
+                  busy={busy}
+                  customer={c}
+                  avatar={CUSTOMER_AVATARS[sheet.customerIdx % CUSTOMER_AVATARS.length]}
+                  onTrade={doTradeFocused}
+                />
+              );
+            })()}
+        </Sheet>
+      )}
 
       {/* Modal vào chơi: chơi ngay / tạo tài khoản / đăng nhập */}
       {showNameModal && (
@@ -636,8 +761,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Toasts */}
-      <div className="fixed bottom-4 left-4 right-4 z-50 flex flex-col gap-2 sm:left-auto sm:w-80">
+      {/* Toasts (đẩy lên trên thanh icon dưới) */}
+      <div className="fixed bottom-20 left-4 right-4 z-50 flex flex-col gap-2 sm:left-auto sm:w-80">
         {toasts.map((t) => (
           <div key={t.id} className={`rounded-2xl border-2 px-3 py-2 text-sm font-bold shadow-lg ${toastStyle[t.kind]}`}>
             {t.text}

@@ -2,6 +2,7 @@
 
 import { Users } from "lucide-react";
 import { STAFF_DEFS } from "@/lib/config";
+import { STAFF_IMAGES } from "@/lib/images";
 import type { StateResponse, StaffType } from "@/lib/types";
 
 function staffEffectText(type: StaffType, level: number): string {
@@ -35,7 +36,11 @@ export default function StaffPanel({
           const owned = player.staff.find((m) => m.type === s.type);
           return (
             <article key={s.type} className="rounded-3xl border-2 border-teal-100 bg-teal-50/40 p-3">
-              <div className="text-2xl">{s.emoji}</div>
+              {STAFF_IMAGES[s.type] ? (
+                <img src={STAFF_IMAGES[s.type]} alt={s.name} className="h-16 w-16 rounded-2xl object-cover" draggable={false} />
+              ) : (
+                <div className="text-2xl">{s.emoji}</div>
+              )}
               <h3 className="font-extrabold text-gray-800">{s.name}</h3>
               <p className="text-xs font-semibold text-gray-500">{s.desc}</p>
               {owned ? (

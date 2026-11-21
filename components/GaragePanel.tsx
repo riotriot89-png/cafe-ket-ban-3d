@@ -2,6 +2,7 @@
 
 import { Lock, Truck } from "lucide-react";
 import { VEHICLES } from "@/lib/config";
+import { VEHICLE_IMAGES } from "@/lib/images";
 import { activeVehicle } from "@/lib/shared";
 import type { StateResponse } from "@/lib/types";
 
@@ -34,7 +35,11 @@ export default function GaragePanel({
             <article key={v.id} className={`rounded-3xl border-2 p-3 ${isActive ? "border-orange-300 bg-orange-50" : "border-orange-100 bg-orange-50/40"}`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-2xl">{v.emoji}</div>
+                  {VEHICLE_IMAGES[v.id] ? (
+                    <img src={VEHICLE_IMAGES[v.id]} alt={v.name} className="h-16 w-16 rounded-2xl object-cover" draggable={false} />
+                  ) : (
+                    <div className="text-2xl">{v.emoji}</div>
+                  )}
                   <h3 className="font-extrabold text-gray-800">{v.name}</h3>
                   <p className="text-xs font-semibold text-gray-500">
                     {v.slots} ô • Tốc độ x{v.speed} • Giảm trộm {Math.round(v.theftCut * 100)}% • Yêu cầu Lv.{v.level}

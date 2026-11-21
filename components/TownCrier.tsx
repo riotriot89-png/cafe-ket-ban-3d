@@ -21,8 +21,8 @@ export default function TownCrier({ market, now }: { market: MarketSnapshot; now
     `Mùa ${market.seasonId} kết thúc sau ${Math.floor((market.seasonEndsAt - now) / 3600000)} giờ — tranh thủ leo top!`,
   ].join("  •  ");
   return (
-    <div className="rounded-3xl border-2 border-amber-100 bg-gradient-to-r from-amber-50 via-pink-50 to-amber-50 shadow-[0_6px_0_rgba(244,114,182,0.15)] px-4 py-3">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-bold text-amber-900">
+    <div className="rounded-3xl border-2 border-amber-100 bg-gradient-to-r from-amber-50 via-pink-50 to-amber-50 px-3 py-2 shadow-[0_6px_0_rgba(244,114,182,0.15)]">
+      <div className="flex flex-nowrap items-center gap-x-5 gap-y-1 overflow-x-auto whitespace-nowrap text-sm font-bold text-amber-900 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <span className="flex items-center gap-1.5">
           <Megaphone className="h-4 w-4 text-pink-500" />
           <span className="text-pink-600">Loa Phường Xóm Nhỏ</span>
@@ -39,7 +39,7 @@ export default function TownCrier({ market, now }: { market: MarketSnapshot; now
           Nhịp giá sau {fmtLeft(market.tickEndsAt - now)}
         </span>
       </div>
-      <div className="mt-2 overflow-hidden whitespace-nowrap text-[13px] font-semibold text-pink-700">
+      <div className="mt-2 hidden overflow-hidden whitespace-nowrap text-[13px] font-semibold text-pink-700 sm:block">
         <div className="inline-block animate-[marquee_28s_linear_infinite]">{ticker} &nbsp; • &nbsp; {ticker}</div>
       </div>
     </div>
