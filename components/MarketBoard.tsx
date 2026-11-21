@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { ArrowDownRight, ArrowUpRight, Lock, ShoppingBag, TrendingUp } from "lucide-react";
 import { ITEMS, ITEM_MAP, WEATHERS, ZONE_MAP } from "@/lib/config";
 import { bagCapacity, bagUsed, customerUnitPrice, meltFactor, merchantUnitPrice, sellFeeRate } from "@/lib/shared";
@@ -8,7 +7,7 @@ import type { StateResponse } from "@/lib/types";
 import ItemImage from "./ItemImage";
 import Sparkline from "./Sparkline";
 
-type SubTab = "merchant" | "customer" | "prices";
+export type MarketSubTab = "merchant" | "customer" | "prices";
 
 function fmtCountdown(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -20,14 +19,17 @@ export default function MarketBoard({
   now,
   busy,
   onTrade,
+  subTab,
+  onSubTabChange,
 }: {
   state: StateResponse;
   now: number;
   busy: boolean;
   onTrade: (action: "buy_merchant" | "sell_customer", waveIndex: number, offerId: string) => void;
+  subTab: MarketSubTab;
+  onSubTabChange: (t: MarketSubTab) => void;
 }) {
   const { player, market, waves } = state;
-  const [tab, setTab] = useState<SubTab>("merchant");
   const traveling = !!player.travel;
   const zone = ZONE_MAP[player.zone];
   const weather = WEATHERS.find((w) => w.id === market.weather)!;
@@ -37,7 +39,7 @@ export default function MarketBoard({
   const boughtOffers = player.boughtOffers ?? [];
   const servedCustomers = player.servedCustomers ?? [];
 
-  const tabs: { id: SubTab; label: string }[] = [
+  const tabs: { id: MarketSubTab; label: string }[] = [
     { id: "merchant", label: "🛒 Thương lái" },
     { id: "customer", label: "🧑 Khách mua" },
     { id: "prices", label: "📈 Bảng giá" },
@@ -61,9 +63,9 @@ export default function MarketBoard({
         {tabs.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => onSubTabChange(t.id)}
             className={`flex-1 rounded-full py-2 text-sm font-extrabold transition ${
-              tab === t.id ? "bg-pink-500 text-white shadow-[0_3px_0_rgba(190,24,93,0.4)]" : "bg-pink-50 text-pink-500"
+              subTab === t.id ? "bg-pink-500 text-white shadow-[0_3px_0_rgba(190,24,93,0.4)]" : "bg-pink-50 text-pink-500"
             }`}
           >
             {t.label}
@@ -71,7 +73,7 @@ export default function MarketBoard({
         ))}
       </div>
 
-      {tab === "merchant" && (
+      {subTab === "merchant" && (
         <div>
           <p className="mb-3 rounded-2xl bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700">
             ⏰ Thương lái đang ở chợ! Đợt mới sau <span className="text-sky-900">{fmtCountdown(waves.merchant.endsAt - now)}</span> — mỗi lô chỉ mua được 1 lần, hết đợt là đi mất đó!
@@ -130,7 +132,7 @@ export default function MarketBoard({
         </div>
       )}
 
-      {tab === "customer" && (
+      {subTab === "customer" && (
         <div>
           <p className="mb-3 rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">
             ⏰ Khách đang đi chợ! Đợt mới sau <span className="text-emerald-900">{fmtCountdown(waves.customer.endsAt - now)}</span> — mỗi khách chỉ mua 1 lần, bán đúng món đúng số lượng họ cần nha!
@@ -195,7 +197,7 @@ export default function MarketBoard({
         </div>
       )}
 
-      {tab === "prices" && (
+      {subTab === "prices" && (
         <div>
           <p className="mb-3 rounded-2xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700">
             📈 Bảng giá chỉ để tham khảo — muốn mua thì chờ đợt Thương lái, muốn bán thì chờ đợt Khách mua nha!

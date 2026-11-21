@@ -15,7 +15,7 @@ import { CUTE_NAMES, ZONES } from "@/lib/config";
 import { playSound, type SoundKind } from "@/lib/sound";
 import type { GameEvent, StateResponse, ZoneId } from "@/lib/types";
 import TownCrier from "@/components/TownCrier";
-import MarketBoard from "@/components/MarketBoard";
+import MarketBoard, { type MarketSubTab } from "@/components/MarketBoard";
 import BagPanel from "@/components/BagPanel";
 import MapPanel from "@/components/MapPanel";
 import QuestsPanel from "@/components/QuestsPanel";
@@ -79,6 +79,17 @@ export default function Home() {
     setActiveTab(tab);
     localStorage.setItem("tmcc_tab", tab);
     window.scrollTo({ top: 0 });
+  };
+  // Tab con của chợ (nâng từ MarketBoard lên để bấm khách/thương lái trên bản đồ
+  // cũng mở đúng tab con).
+  const [marketSubTab, setMarketSubTab] = useState<MarketSubTab>("merchant");
+  const goToCustomers = () => {
+    setMarketSubTab("customer");
+    switchTab("cho");
+  };
+  const goToMerchants = () => {
+    setMarketSubTab("merchant");
+    switchTab("cho");
   };
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
@@ -497,9 +508,9 @@ export default function Home() {
 
         {state ? (
           <>
-            {activeTab === "cho" && <MarketBoard state={state} now={now} busy={busy} onTrade={doTrade} />}
+            {activeTab === "cho" && <MarketBoard state={state} now={now} busy={busy} onTrade={doTrade} subTab={marketSubTab} onSubTabChange={setMarketSubTab} />}
             {activeTab === "tui" && <BagPanel state={state} now={now} />}
-            {activeTab === "map" && <MapPanel state={state} now={now} busy={busy} onTravel={doTravel} />}
+            {activeTab === "map" && <MapPanel state={state} now={now} busy={busy} onTravel={doTravel} onGoToCustomers={goToCustomers} onGoToMerchants={goToMerchants} />}
             {activeTab === "quests" && <QuestsPanel state={state} busy={busy} onClaim={(id) => doQuest("claim", id)} onReroll={(id) => doQuest("reroll", id)} />}
             {activeTab === "leaderboard" && <LeaderboardPanel state={state} />}
             {activeTab === "garage" && <GaragePanel state={state} busy={busy} onGarage={doGarage} />}
