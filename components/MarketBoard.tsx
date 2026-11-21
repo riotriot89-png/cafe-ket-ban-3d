@@ -5,6 +5,7 @@ import { ArrowDownRight, ArrowUpRight, Lock, ShoppingBag, TrendingUp } from "luc
 import { ITEMS, ITEM_MAP, WEATHERS, ZONE_MAP } from "@/lib/config";
 import { bagCapacity, bagUsed, customerUnitPrice, meltFactor, merchantUnitPrice, sellFeeRate } from "@/lib/shared";
 import type { StateResponse } from "@/lib/types";
+import ItemImage from "./ItemImage";
 import Sparkline from "./Sparkline";
 
 type SubTab = "merchant" | "customer" | "prices";
@@ -94,7 +95,7 @@ export default function MarketBoard({
                       <div key={offer.id} className={`rounded-2xl border-2 p-3 ${locked ? "border-gray-100 bg-gray-50 opacity-70" : "border-white bg-white"}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="text-2xl leading-none">{item.emoji}</div>
+                            <ItemImage itemId={offer.itemId} emoji={item.emoji} className="h-16 w-16 rounded-2xl object-cover" />
                             <div className="mt-1 font-extrabold text-gray-800">{item.name} <span className="text-pink-600">x{offer.qty}</span></div>
                             <div className="text-xs font-semibold text-gray-500">
                               {item.slots * offer.qty} ô • Gốc {item.base.toLocaleString("vi-VN")} Xu • Lv.{item.level}
@@ -154,7 +155,7 @@ export default function MarketBoard({
                     {c.emoji} {c.name} <span className="text-xs font-bold text-emerald-600">• muốn mua</span>
                   </h3>
                   <div className="mt-2 flex items-start gap-2">
-                    <div className="text-3xl leading-none">{item.emoji}</div>
+                    <ItemImage itemId={offer.itemId} emoji={item.emoji} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
                     <div>
                       <div className="font-extrabold text-gray-800">{item.name} <span className="text-pink-600">x{offer.qty}</span></div>
                       <div className="text-xs font-semibold text-gray-500">Gốc {item.base.toLocaleString("vi-VN")} Xu • Lv.{item.level} • Bạn đang có: {owned} món</div>
@@ -210,7 +211,7 @@ export default function MarketBoard({
                 <article key={item.id} className={`rounded-3xl border-2 p-3 ${locked ? "border-gray-100 bg-gray-50 opacity-70" : "border-pink-100 bg-pink-50/40"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="text-2xl leading-none">{item.emoji}</div>
+                      <ItemImage itemId={item.id} emoji={item.emoji} className="h-16 w-16 rounded-2xl object-cover" />
                       <h3 className="mt-1 font-extrabold text-gray-800">{item.name}</h3>
                       <p className="text-xs font-semibold text-gray-500">
                         {item.slots} ô • Gốc {item.base.toLocaleString("vi-VN")} Xu • Lv.{item.level}

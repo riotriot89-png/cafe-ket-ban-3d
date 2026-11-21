@@ -3,6 +3,7 @@
 import { Footprints, MapPin, Truck } from "lucide-react";
 import { ZONES } from "@/lib/config";
 import type { StateResponse, ZoneId } from "@/lib/types";
+import { ZoneImage } from "./ItemImage";
 
 export default function MapPanel({
   state,
@@ -59,8 +60,8 @@ export default function MapPanel({
                     : "border-sky-100 bg-sky-50/50 hover:border-sky-300"
               } disabled:opacity-60`}
             >
-              <div className="text-2xl">{z.emoji}</div>
-              <div className="font-extrabold text-gray-800">{z.name}</div>
+              <ZoneImage zoneId={z.id} emoji={z.emoji} className="h-24 w-full rounded-2xl object-cover" />
+              <div className="mt-2 font-extrabold text-gray-800">{z.emoji} {z.name}</div>
               <div className="text-xs font-semibold text-gray-500">{z.desc}</div>
               <div className="mt-1 text-xs font-extrabold text-pink-600">
                 {isHere ? "📍 Bạn đang ở đây" : isDest ? "🚚 Đang tới đây..." : "Đi tới đây →"}

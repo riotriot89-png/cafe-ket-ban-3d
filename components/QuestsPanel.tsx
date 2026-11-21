@@ -1,7 +1,9 @@
 "use client";
 
 import { ClipboardList, Gift, RefreshCw } from "lucide-react";
+import { ITEM_MAP } from "@/lib/config";
 import type { StateResponse } from "@/lib/types";
+import ItemImage from "./ItemImage";
 
 export default function QuestsPanel({
   state,
@@ -25,11 +27,16 @@ export default function QuestsPanel({
         {player.quests.map((q) => (
           <li key={q.id} className={`rounded-2xl border-2 px-3 py-2 ${q.done ? "border-emerald-200 bg-emerald-50" : "border-violet-100 bg-violet-50/50"}`}>
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-extrabold text-gray-800">{q.done ? "✅ " : "📋 "}{q.title}</div>
-                <div className="text-xs font-semibold text-gray-500">{q.desc}</div>
-                <div className="mt-1 text-xs font-bold text-violet-600">
-                  Thưởng: +{q.rewardXu.toLocaleString("vi-VN")} Xu • +{q.rewardExp} EXP • 🎁 Rương quà
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                {q.itemId && ITEM_MAP[q.itemId] && (
+                  <ItemImage itemId={q.itemId} emoji={ITEM_MAP[q.itemId].emoji} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
+                )}
+                <div className="min-w-0">
+                  <div className="font-extrabold text-gray-800">{q.done ? "✅ " : "📋 "}{q.title}</div>
+                  <div className="text-xs font-semibold text-gray-500">{q.desc}</div>
+                  <div className="mt-1 text-xs font-bold text-violet-600">
+                    Thưởng: +{q.rewardXu.toLocaleString("vi-VN")} Xu • +{q.rewardExp} EXP • 🎁 Rương quà
+                  </div>
                 </div>
               </div>
               <button

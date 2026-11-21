@@ -4,6 +4,7 @@ import { Backpack, Snowflake } from "lucide-react";
 import { ITEM_MAP, WEATHERS } from "@/lib/config";
 import { meltFactor, sellPrice } from "@/lib/shared";
 import type { StateResponse } from "@/lib/types";
+import ItemImage from "./ItemImage";
 
 export default function BagPanel({
   state,
@@ -41,7 +42,7 @@ export default function BagPanel({
             const profitPct = ((unitSell - lot.avgCost) / lot.avgCost) * 100;
             return (
               <li key={lot.itemId} className="flex items-center gap-3 rounded-2xl border-2 border-amber-100 bg-amber-50/50 px-3 py-2">
-                <span className="text-2xl">{item.emoji}</span>
+                <ItemImage itemId={lot.itemId} emoji={item.emoji} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-extrabold text-gray-800">
                     {item.name} <span className="text-pink-600">x{lot.qty}</span>
